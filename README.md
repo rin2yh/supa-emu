@@ -1,17 +1,17 @@
 # supa-emu (Supabase Emulator)
 
-Supabase Auth (GoTrue) 互換の HTTP エンドポイントを提供する軽量 Go エミュレータ。`supabase start`（Docker）の代替として、CI や開発機で高速に起動できる。
+A lightweight Go emulator that exposes Supabase Auth (GoTrue) compatible HTTP endpoints. As an alternative to `supabase start` (Docker), it starts up fast on CI and developer machines.
 
-- モジュール名: `github.com/rin2yh/supa-emu`
-- バイナリ名: `supabase-emulator`
+- Module name: `github.com/rin2yh/supa-emu`
+- Binary name: `supabase-emulator`
 
-`main.go` がエントリポイントの**シングルバイナリ**。auth 以外（storage/realtime）も今後ここに mount する設計で、`main.go` に `Handle` を 1 行足すだけで拡張できる。
+A **single binary** with `main.go` as the entry point. It is designed so that services other than auth (storage/realtime) can be mounted here in the future — extending it is as simple as adding a single `Handle` line to `main.go`.
 
-## インストール
+## Installation
 
-### GitHub Releases から
+### From GitHub Releases
 
-リリースには `supabase-emulator_<version>_<os>_<arch>.tar.gz` 形式のアセットが添付される。`gh` CLI でダウンロードして展開する。
+Releases attach assets in the form `supabase-emulator_<version>_<os>_<arch>.tar.gz`. Download and extract them with the `gh` CLI.
 
 macOS (arm64):
 
@@ -33,101 +33,101 @@ tar -xzf supabase-emulator_*_linux_amd64.tar.gz
 ./supabase-emulator -addr 127.0.0.1:54321
 ```
 
-`v0.1.0` は取得したいバージョンタグに置き換えること。最新版を取得する場合はタグを省略して `gh release download --repo rin2yh/supa-emu ...` のように指定できる。
+Replace `v0.1.0` with the version tag you want. To grab the latest version, omit the tag and run something like `gh release download --repo rin2yh/supa-emu ...`.
 
-### go install から
+### From go install
 
 ```bash
 go install github.com/rin2yh/supa-emu@latest
 ```
 
-## ビルドと起動
+## Build and run
 
-### Makefile 経由
+### Via Makefile
 
 ```bash
-make build              # Go バイナリを bin/supabase-emulator にビルド
-make run                # ビルドして起動
-make test               # Go テストを実行
-make test-race          # Race detector 付きで Go テストを実行
-make clean              # bin ディレクトリを削除
+make build              # Build the Go binary to bin/supabase-emulator
+make run                # Build and run
+make test               # Run Go tests
+make test-race          # Run Go tests with the race detector
+make clean              # Remove the bin directory
 ```
 
-その他に `make lint`（`go vet ./...`）、`make fmt`（`gofmt -w .`）が利用できる。
+`make lint` (`go vet ./...`) and `make fmt` (`gofmt -w .`) are also available.
 
-### 素の go コマンド
+### Plain go commands
 
 ```bash
 go build -o bin/supabase-emulator .
 ./bin/supabase-emulator -addr 127.0.0.1:54321
 
-go test -count=1 ./...        # テスト
-go test -race -count=1 ./...  # Race detector 付きテスト
+go test -count=1 ./...        # tests
+go test -race -count=1 ./...  # tests with the race detector
 ```
 
-## 実装済みエンドポイント
+## Implemented endpoints
 
-| Method | Path | 用途 |
-|--------|------|------|
-| GET | `/auth/v1/health` | ヘルスチェック |
-| GET | `/auth/v1/settings` | 公開設定 |
-| POST | `/auth/v1/signup` | サインアップ（mailer_autoconfirm=true 想定で `AccessTokenResponse` を返す） |
-| POST | `/auth/v1/token?grant_type=password` | ログイン |
-| POST | `/auth/v1/token?grant_type=refresh_token` | refresh token rotation（reuse_interval 既定 10 秒） |
-| GET | `/auth/v1/user` | 現在ユーザー取得 |
-| POST | `/auth/v1/logout` | ログアウト（refresh token 失効） |
-| GET | `/auth/v1/admin/users` | 全ユーザー一覧（page / per_page サポート） |
-| DELETE | `/auth/v1/admin/users/{id}` | ユーザー削除 |
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/auth/v1/health` | Health check |
+| GET | `/auth/v1/settings` | Public settings |
+| POST | `/auth/v1/signup` | Sign up (returns an `AccessTokenResponse`, assuming mailer_autoconfirm=true) |
+| POST | `/auth/v1/token?grant_type=password` | Login |
+| POST | `/auth/v1/token?grant_type=refresh_token` | Refresh token rotation (reuse_interval defaults to 10s) |
+| GET | `/auth/v1/user` | Get the current user |
+| POST | `/auth/v1/logout` | Logout (revokes the refresh token) |
+| GET | `/auth/v1/admin/users` | List all users (supports page / per_page) |
+| DELETE | `/auth/v1/admin/users/{id}` | Delete a user |
 
-上記に一致しないパスはすべて catch-all で `404 Not Found` を返す。
+Any path that does not match the above is handled by a catch-all that returns `404 Not Found`.
 
-### エミュレータ拡張（テスト用 `/__emulator/*`）
+### Emulator extensions (`/__emulator/*` for testing)
 
-| Method | Path | 用途 |
-|--------|------|------|
-| POST | `/__emulator/reset` | 全インメモリ State クリア |
-| GET | `/__emulator/snapshot` | users / sessions / refresh_tokens の現状ダンプ |
-| POST | `/__emulator/users` | テスト用ユーザの直接シード |
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/__emulator/reset` | Clear all in-memory state |
+| GET | `/__emulator/snapshot` | Dump the current users / sessions / refresh_tokens |
+| POST | `/__emulator/users` | Seed test users directly |
 
-## CLIフラグ / 環境変数 / 既定値
+## CLI flags / environment variables / defaults
 
-CLI フラグは環境変数より優先される。
+CLI flags take precedence over environment variables.
 
-| フラグ | 環境変数 | 既定値 |
-|--------|----------|--------|
+| Flag | Environment variable | Default |
+|------|----------------------|---------|
 | `-addr` | `SUPABASE_EMULATOR_ADDR` | `127.0.0.1:54321` |
-| `-jwt-secret` | `SUPABASE_EMULATOR_JWT_SECRET` | Supabase CLI 既定値 |
+| `-jwt-secret` | `SUPABASE_EMULATOR_JWT_SECRET` | Supabase CLI default |
 | `-jwt-issuer` | - | `http://127.0.0.1:54321/auth/v1` |
 | `-access-token-ttl` | - | `1h` |
 | `-refresh-reuse-interval` | - | `10s` |
 
-`-jwt-secret` は HS256 の署名鍵、`-jwt-issuer` は JWT の `iss` クレーム、`-access-token-ttl` は access_token の有効期間、`-refresh-reuse-interval` は refresh token rotation の再利用許容間隔を指定する。
+`-jwt-secret` sets the HS256 signing key, `-jwt-issuer` sets the JWT `iss` claim, `-access-token-ttl` sets the access_token lifetime, and `-refresh-reuse-interval` sets the allowed reuse window for refresh token rotation.
 
-## アプリ層の結合テストと組み合わせる
+## Combining with application-layer integration tests
 
-エミュレータの起動・ビルドはテスト側スクリプトに含めない設計。事前にこのバイナリを別ターミナルで起動しておき、アプリ層の結合テストや E2E を実行する。
+The emulator is designed so that starting and building it is not part of the test-side scripts. Start this binary in a separate terminal beforehand, then run your application-layer integration or E2E tests.
 
 ```bash
-# ターミナル1: エミュレータを起動しっぱなしにする
+# Terminal 1: keep the emulator running
 ./bin/supabase-emulator -addr 127.0.0.1:54321
 
-# ターミナル2: 結合テスト or E2E を実行
+# Terminal 2: run integration tests or E2E
 ```
 
-## 設計判断
+## Design decisions
 
-- **インメモリのみ**: テスト/開発用途のため永続化なし。`/__emulator/reset` で初期化。
-- **apikey 検証なし**: apikey / Authorization の検証は行わない。何を送っても通る。
-- **HS256 固定**: Supabase CLI と同じ秘密鍵を既定値に採用しているため、クライアント側の設定変更が不要。
-- **シングルバイナリ**: storage/realtime を追加するときは `main.go` に `Handle` を 1 行足すだけ。
+- **In-memory only**: No persistence, since it targets testing/development. Reset state with `/__emulator/reset`.
+- **No apikey validation**: apikey / Authorization are not validated. Anything you send is accepted.
+- **HS256 fixed**: It adopts the same secret key as the Supabase CLI as its default, so no client-side configuration changes are needed.
+- **Single binary**: When adding storage/realtime, just add a single `Handle` line to `main.go`.
 
-## 未対応機能
+## Unsupported features
 
 - OAuth / Phone / MFA / Email confirmation / Captcha
-- メール送信
+- Email sending
 - DB Hooks / Functions
 - Realtime / Storage / Postgrest
 
-## ライセンス
+## License
 
-[LICENSE](./LICENSE) を参照。
+See [LICENSE](./LICENSE).
