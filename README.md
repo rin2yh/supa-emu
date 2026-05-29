@@ -113,9 +113,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: rin2yh/supa-emu@v1
+      - uses: rin2yh/supa-emu@v0.1.0   # pin to a released tag
         with:
-          version: latest        # or a specific tag like v0.1.0
+          version: v0.1.0               # release binary to download
           addr: 127.0.0.1:54321
       # The emulator is now running at 127.0.0.1:54321 for the rest of the job.
       - run: npm test            # your integration/E2E tests
