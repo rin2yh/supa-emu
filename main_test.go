@@ -114,7 +114,7 @@ func freePort() (string, error) {
 func buildBinary(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	out := filepath.Join(dir, "supabase-emulator")
+	out := filepath.Join(dir, "supa-emu")
 	cmd := exec.Command("go", "build", "-o", out, ".")
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {

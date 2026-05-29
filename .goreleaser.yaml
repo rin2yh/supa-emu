@@ -1,14 +1,14 @@
 version: 2
-project_name: supabase-emulator   # リポジトリ名(supa-emu)に引きずられず supabase-emulator_ 始まりに固定
+project_name: supa-emu
 
 before:
   hooks:
     - go mod tidy
 
 builds:
-  - id: supabase-emulator
+  - id: supa-emu
     main: ./
-    binary: supabase-emulator
+    binary: supa-emu
     env:
       - CGO_ENABLED=0
     goos: [linux, darwin]
@@ -20,8 +20,8 @@ builds:
       - -s -w
 
 archives:
-  - id: supabase-emulator
-    ids: [supabase-emulator]
+  - id: supa-emu
+    ids: [supa-emu]
     formats: [tar.gz]
     name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
     files:

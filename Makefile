@@ -1,6 +1,6 @@
 .PHONY: build test test-race lint fmt run clean
 
-BIN := bin/supabase-emulator
+BIN := bin/supa-emu
 
 build:
 	go build -o $(BIN) .

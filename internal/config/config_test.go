@@ -7,8 +7,8 @@ import (
 
 func TestParse(t *testing.T) {
 	t.Run("デフォルト値を返す", func(t *testing.T) {
-		t.Setenv("SUPABASE_EMULATOR_ADDR", "")
-		t.Setenv("SUPABASE_EMULATOR_JWT_SECRET", "")
+		t.Setenv("SUPA_EMU_ADDR", "")
+		t.Setenv("SUPA_EMU_JWT_SECRET", "")
 		cfg, err := Parse(nil)
 		if err != nil {
 			t.Fatalf("Parse: %v", err)
@@ -25,7 +25,7 @@ func TestParse(t *testing.T) {
 	})
 
 	t.Run("CLIフラグが環境変数より優先される", func(t *testing.T) {
-		t.Setenv("SUPABASE_EMULATOR_ADDR", "0.0.0.0:9999")
+		t.Setenv("SUPA_EMU_ADDR", "0.0.0.0:9999")
 		cfg, err := Parse([]string{"-addr", "127.0.0.1:8888"})
 		if err != nil {
 			t.Fatalf("Parse: %v", err)

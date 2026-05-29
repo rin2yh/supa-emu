@@ -76,10 +76,10 @@ runs:
         if [ "$VERSION" != "latest" ]; then tag="$VERSION"; fi
         gh release download $tag \
           --repo rin2yh/supa-emu \
-          --pattern "supabase-emulator_*_${os}_${arch}.tar.gz" \
+          --pattern "supa-emu_*_${os}_${arch}.tar.gz" \
           --dir "$dir"
-        tar -xzf "$dir"/supabase-emulator_*_"${os}_${arch}".tar.gz -C "$dir"
-        chmod +x "$dir/supabase-emulator"
+        tar -xzf "$dir"/supa-emu_*_"${os}_${arch}".tar.gz -C "$dir"
+        chmod +x "$dir/supa-emu"
         echo "$dir" >> "$GITHUB_PATH"
 
     - id: start
@@ -98,11 +98,11 @@ runs:
         if [ -n "$ACCESS_TOKEN_TTL" ]; then args+=( -access-token-ttl "$ACCESS_TOKEN_TTL" ); fi
         if [ -n "$REFRESH_REUSE_INTERVAL" ]; then args+=( -refresh-reuse-interval "$REFRESH_REUSE_INTERVAL" ); fi
         log="$RUNNER_TEMP/supa-emu/emulator.log"
-        nohup supabase-emulator "${args[@]}" > "$log" 2>&1 &
+        nohup supa-emu "${args[@]}" > "$log" 2>&1 &
         pid=$!
         echo "pid=$pid" >> "$GITHUB_OUTPUT"
         echo "log=$log" >> "$GITHUB_OUTPUT"
-        echo "started supabase-emulator (pid=$pid), addr=$ADDR, log=$log"
+        echo "started supa-emu (pid=$pid), addr=$ADDR, log=$log"
 
     - id: health
       if: ${{ inputs.wait-for-health == 'true' }}

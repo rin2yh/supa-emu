@@ -33,7 +33,7 @@ func (f *Factory) Handle(fn Func) http.Handler {
 		// handler 内 panic を 500 + JSON エラーに変換し、connection reset を防ぐ。
 		defer func() {
 			if rec := recover(); rec != nil {
-				fmt.Fprintf(os.Stderr, "supabase-emulator: handler panic: %v\n%s\n", rec, debug.Stack())
+				fmt.Fprintf(os.Stderr, "supa-emu: handler panic: %v\n%s\n", rec, debug.Stack())
 				c.ErrorCode(http.StatusInternalServerError, "unexpected_failure", "internal server error")
 			}
 		}()
@@ -85,7 +85,7 @@ func (c *Context) JSON(status int, body any) {
 	}
 	if err := json.NewEncoder(c.w).Encode(body); err != nil {
 		// WriteHeader 既送のためレスポンスでは挽回不可。半端 JSON の事実だけ stderr に残す。
-		fmt.Fprintf(os.Stderr, "supabase-emulator: response encode failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "supa-emu: response encode failed: %v\n", err)
 	}
 }
 

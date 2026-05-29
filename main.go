@@ -17,7 +17,7 @@ import (
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, "supabase-emulator: "+err.Error())
+		fmt.Fprintln(os.Stderr, "supa-emu: "+err.Error())
 		os.Exit(1)
 	}
 }
@@ -56,7 +56,7 @@ func run(args []string) error {
 
 	errCh := make(chan error, 1)
 	go func() {
-		_, _ = fmt.Fprintf(os.Stdout, "supabase-emulator listening on %s\n", cfg.Addr)
+		_, _ = fmt.Fprintf(os.Stdout, "supa-emu listening on %s\n", cfg.Addr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 			return

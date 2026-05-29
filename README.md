@@ -3,7 +3,7 @@
 A lightweight Go emulator exposing Supabase Auth (GoTrue) compatible HTTP endpoints. A fast, single-binary alternative to `supabase start` (Docker) for CI and local development.
 
 - Module: `github.com/rin2yh/supa-emu`
-- Binary: `supabase-emulator`
+- Binary: `supa-emu`
 
 ## Install
 
@@ -16,14 +16,14 @@ Or download a prebuilt binary from [GitHub Releases](https://github.com/rin2yh/s
 ## Run
 
 ```bash
-go build -o bin/supabase-emulator .
-./bin/supabase-emulator -addr 127.0.0.1:54321
+go build -o bin/supa-emu .
+./bin/supa-emu -addr 127.0.0.1:54321
 ```
 
 | Flag | Env | Default |
 |------|-----|---------|
-| `-addr` | `SUPABASE_EMULATOR_ADDR` | `127.0.0.1:54321` |
-| `-jwt-secret` | `SUPABASE_EMULATOR_JWT_SECRET` | Supabase CLI default |
+| `-addr` | `SUPA_EMU_ADDR` | `127.0.0.1:54321` |
+| `-jwt-secret` | `SUPA_EMU_JWT_SECRET` | Supabase CLI default |
 | `-jwt-issuer` | - | `http://127.0.0.1:54321/auth/v1` |
 | `-access-token-ttl` | - | `1h` |
 | `-refresh-reuse-interval` | - | `10s` |

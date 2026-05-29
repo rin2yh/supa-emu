@@ -35,14 +35,14 @@ func Default() Config {
 // CLI フラグが環境変数より優先される。
 func Parse(args []string) (Config, error) {
 	cfg := Default()
-	if v := os.Getenv("SUPABASE_EMULATOR_ADDR"); v != "" {
+	if v := os.Getenv("SUPA_EMU_ADDR"); v != "" {
 		cfg.Addr = v
 	}
-	if v := os.Getenv("SUPABASE_EMULATOR_JWT_SECRET"); v != "" {
+	if v := os.Getenv("SUPA_EMU_JWT_SECRET"); v != "" {
 		cfg.Auth.JWTSecret = v
 	}
 
-	fs := flag.NewFlagSet("supabase-emulator", flag.ContinueOnError)
+	fs := flag.NewFlagSet("supa-emu", flag.ContinueOnError)
 	// 不正フラグ時に FlagSet が独自で stderr に Usage を吐くのを抑止し、
 	// エラー出力は呼び出し側 (main) の 1 行に統一する。
 	fs.SetOutput(io.Discard)
