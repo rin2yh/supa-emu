@@ -32,13 +32,22 @@ CLI flags take precedence over environment variables.
 
 ## Use as a GitHub Action
 
+A composite action (`action.yml`) downloads the release binary, starts the emulator in the background, and waits for it to be healthy.
+
 ```yaml
-- uses: rin2yh/supa-emu@v0.1.0   # pin to a released tag
-  with:
-    version: v0.1.0
-    addr: 127.0.0.1:54321
-# The emulator is now running for the rest of the job.
+jobs:
+  e2e:
+    runs-on: ubuntu-latest   # or macos-*; amd64 / arm64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rin2yh/supa-emu@v0.1.0   # pin to a released tag
+        with:
+          version: v0.1.0
+          addr: 127.0.0.1:54321
+      - run: npm test   # the emulator is up for the rest of the job
 ```
+
+Inputs: `version` (default `latest`), `addr` (default `127.0.0.1:54321`), `jwt-secret`, `jwt-issuer`, `access-token-ttl`, `refresh-reuse-interval`, `wait-for-health` (default `true`), `github-token` (default `${{ github.token }}`). Outputs: `addr`, `pid`, `log`.
 
 ## Endpoints
 
