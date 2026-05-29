@@ -1,0 +1,10 @@
+[tagpr]
+    releaseBranch = main
+    # ソースにバージョン文字列が無いため git タグのみで管理
+    versionFile = -
+    vPrefix = true
+    # GitHub Release は GoReleaser に作らせるため tagpr 側では作らない
+    release = false
+    majorLabels = major
+    minorLabels = minor
+    changelog = true

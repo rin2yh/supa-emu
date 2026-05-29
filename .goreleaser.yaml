@@ -1,0 +1,42 @@
+version: 2
+project_name: supabase-emulator   # リポジトリ名(supa-emu)に引きずられず supabase-emulator_ 始まりに固定
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: supabase-emulator
+    main: ./
+    binary: supabase-emulator
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+
+archives:
+  - id: supabase-emulator
+    ids: [supabase-emulator]
+    formats: [tar.gz]
+    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    files:
+      - LICENSE*
+      - README*
+
+checksum:
+  name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  filters:
+    exclude: ['^docs:', '^test:', '^chore:', 'Merge pull request', 'Merge branch']
+
+release:
+  draft: false
+  prerelease: auto
