@@ -1,0 +1,125 @@
+name: 'Supabase Auth Emulator'
+description: 'Download and run the supa-emu Supabase Auth (GoTrue) compatible emulator in the background.'
+author: 'rin2yh'
+branding:
+  icon: 'shield'
+  color: 'green'
+
+inputs:
+  version:
+    description: 'Release tag to download (e.g. v0.1.0). Use "latest" for the latest release.'
+    required: false
+    default: 'latest'
+  addr:
+    description: 'Listen address passed to -addr.'
+    required: false
+    default: '127.0.0.1:54321'
+  jwt-secret:
+    description: 'HS256 signing key (-jwt-secret). Left to the emulator built-in default when empty.'
+    required: false
+    default: ''
+  jwt-issuer:
+    description: 'JWT iss claim (-jwt-issuer). Uses the emulator default when empty.'
+    required: false
+    default: ''
+  access-token-ttl:
+    description: 'Access token lifetime (-access-token-ttl), e.g. 1h. Uses the emulator default when empty.'
+    required: false
+    default: ''
+  refresh-reuse-interval:
+    description: 'Refresh token reuse window (-refresh-reuse-interval), e.g. 10s. Uses the emulator default when empty.'
+    required: false
+    default: ''
+  wait-for-health:
+    description: 'Wait until /auth/v1/health responds before finishing.'
+    required: false
+    default: 'true'
+  github-token:
+    description: 'Token used to download the release asset via the gh CLI.'
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  addr:
+    description: 'The address the emulator is listening on.'
+    value: ${{ inputs.addr }}
+  pid:
+    description: 'PID of the started emulator process.'
+    value: ${{ steps.start.outputs.pid }}
+  log:
+    description: 'Path to the emulator log file.'
+    value: ${{ steps.start.outputs.log }}
+
+runs:
+  using: 'composite'
+  steps:
+    - id: download
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        case "$RUNNER_OS" in
+          Linux) os=linux ;;
+          macOS) os=darwin ;;
+          *) echo "::error::unsupported runner OS: $RUNNER_OS (only Linux and macOS are supported)"; exit 1 ;;
+        esac
+        case "$RUNNER_ARCH" in
+          X64) arch=amd64 ;;
+          ARM64) arch=arm64 ;;
+          *) echo "::error::unsupported runner ARCH: $RUNNER_ARCH (only X64 and ARM64 are supported)"; exit 1 ;;
+        esac
+        dir="$RUNNER_TEMP/supa-emu"
+        mkdir -p "$dir"
+        tag=""
+        if [ "$VERSION" != "latest" ]; then tag="$VERSION"; fi
+        gh release download $tag \
+          --repo rin2yh/supa-emu \
+          --pattern "supabase-emulator_*_${os}_${arch}.tar.gz" \
+          --dir "$dir"
+        tar -xzf "$dir"/supabase-emulator_*_"${os}_${arch}".tar.gz -C "$dir"
+        chmod +x "$dir/supabase-emulator"
+        echo "$dir" >> "$GITHUB_PATH"
+
+    - id: start
+      shell: bash
+      env:
+        ADDR: ${{ inputs.addr }}
+        JWT_SECRET: ${{ inputs.jwt-secret }}
+        JWT_ISSUER: ${{ inputs.jwt-issuer }}
+        ACCESS_TOKEN_TTL: ${{ inputs.access-token-ttl }}
+        REFRESH_REUSE_INTERVAL: ${{ inputs.refresh-reuse-interval }}
+      run: |
+        set -euo pipefail
+        args=( -addr "$ADDR" )
+        if [ -n "$JWT_SECRET" ]; then args+=( -jwt-secret "$JWT_SECRET" ); fi
+        if [ -n "$JWT_ISSUER" ]; then args+=( -jwt-issuer "$JWT_ISSUER" ); fi
+        if [ -n "$ACCESS_TOKEN_TTL" ]; then args+=( -access-token-ttl "$ACCESS_TOKEN_TTL" ); fi
+        if [ -n "$REFRESH_REUSE_INTERVAL" ]; then args+=( -refresh-reuse-interval "$REFRESH_REUSE_INTERVAL" ); fi
+        log="$RUNNER_TEMP/supa-emu/emulator.log"
+        nohup supabase-emulator "${args[@]}" > "$log" 2>&1 &
+        pid=$!
+        echo "pid=$pid" >> "$GITHUB_OUTPUT"
+        echo "log=$log" >> "$GITHUB_OUTPUT"
+        echo "started supabase-emulator (pid=$pid), addr=$ADDR, log=$log"
+
+    - id: health
+      if: ${{ inputs.wait-for-health == 'true' }}
+      shell: bash
+      env:
+        ADDR: ${{ inputs.addr }}
+        LOG: ${{ steps.start.outputs.log }}
+      run: |
+        set -euo pipefail
+        url="http://${ADDR}/auth/v1/health"
+        for i in $(seq 1 30); do
+          if curl -fsS "$url" >/dev/null 2>&1; then
+            echo "emulator is healthy at $url"
+            exit 0
+          fi
+          sleep 1
+        done
+        echo "::error::emulator did not become healthy at $url within 30s"
+        [ -f "$LOG" ] && cat "$LOG"
+        exit 1

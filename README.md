@@ -103,6 +103,47 @@ CLI flags take precedence over environment variables.
 
 `-jwt-secret` sets the HS256 signing key, `-jwt-issuer` sets the JWT `iss` claim, `-access-token-ttl` sets the access_token lifetime, and `-refresh-reuse-interval` sets the allowed reuse window for refresh token rotation.
 
+## Use as a GitHub Action
+
+This repository ships a composite action that downloads the release binary, starts the emulator in the background, and waits for it to become healthy. Use it from any workflow so your integration/E2E tests can run against a live emulator.
+
+```yaml
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rin2yh/supa-emu@v1
+        with:
+          version: latest        # or a specific tag like v0.1.0
+          addr: 127.0.0.1:54321
+      # The emulator is now running at 127.0.0.1:54321 for the rest of the job.
+      - run: npm test            # your integration/E2E tests
+```
+
+### Inputs
+
+| Input | Default | Description |
+|-------|---------|-------------|
+| `version` | `latest` | Release tag to download (e.g. `v0.1.0`), or `latest`. |
+| `addr` | `127.0.0.1:54321` | Listen address (`-addr`). |
+| `jwt-secret` | (emulator default) | HS256 signing key (`-jwt-secret`). |
+| `jwt-issuer` | (emulator default) | JWT `iss` claim (`-jwt-issuer`). |
+| `access-token-ttl` | (emulator default) | Access token lifetime (`-access-token-ttl`). |
+| `refresh-reuse-interval` | (emulator default) | Refresh token reuse window (`-refresh-reuse-interval`). |
+| `wait-for-health` | `true` | Wait until `/auth/v1/health` responds before finishing. |
+| `github-token` | `${{ github.token }}` | Token used to download the release asset via the `gh` CLI. |
+
+### Outputs
+
+| Output | Description |
+|--------|-------------|
+| `addr` | The address the emulator is listening on. |
+| `pid` | PID of the started emulator process. |
+| `log` | Path to the emulator log file. |
+
+Runs on Linux and macOS runners (amd64 / arm64).
+
 ## Combining with application-layer integration tests
 
 The emulator is designed so that starting and building it is not part of the test-side scripts. Start this binary in a separate terminal beforehand, then run your application-layer integration or E2E tests.
