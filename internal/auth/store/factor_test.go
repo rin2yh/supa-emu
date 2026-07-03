@@ -7,7 +7,7 @@ import (
 )
 
 func TestEnrollFactor(t *testing.T) {
-	t.Run("unverified な webauthn factor を登録し user.Factors に現れる", func(t *testing.T) {
+	t.Run("enrolls an unverified webauthn factor that appears on user.Factors", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		u, _ := s.CreateUser("alice@example.com", hash)
@@ -29,7 +29,7 @@ func TestEnrollFactor(t *testing.T) {
 		}
 	})
 
-	t.Run("同一ユーザで friendly_name が重複すると ErrFactorNameConflict", func(t *testing.T) {
+	t.Run("duplicate friendly_name for the same user returns ErrFactorNameConflict", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		u, _ := s.CreateUser("alice@example.com", hash)
@@ -42,7 +42,7 @@ func TestEnrollFactor(t *testing.T) {
 		}
 	})
 
-	t.Run("存在しないユーザは ErrUserNotFound", func(t *testing.T) {
+	t.Run("unknown user returns ErrUserNotFound", func(t *testing.T) {
 		s := newStore()
 		if _, err := s.EnrollFactor("nope", FactorTypeWebAuthn, ""); !errors.Is(err, ErrUserNotFound) {
 			t.Fatalf("expected ErrUserNotFound, got %v", err)
@@ -51,7 +51,7 @@ func TestEnrollFactor(t *testing.T) {
 }
 
 func TestVerifyFactorAndChallenge(t *testing.T) {
-	t.Run("challenge を発行し consume で single-use 消費、factor を verified に昇格", func(t *testing.T) {
+	t.Run("issues a challenge, consumes it single-use, and promotes the factor to verified", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		u, _ := s.CreateUser("alice@example.com", hash)
@@ -68,7 +68,7 @@ func TestVerifyFactorAndChallenge(t *testing.T) {
 		if _, err := s.ConsumeChallenge(f.ID, ch.ID); err != nil {
 			t.Fatalf("ConsumeChallenge: %v", err)
 		}
-		// 2 回目は single-use のため not found
+		// The second consume is not found because the challenge is single-use.
 		if _, err := s.ConsumeChallenge(f.ID, ch.ID); !errors.Is(err, ErrChallengeNotFound) {
 			t.Fatalf("expected ErrChallengeNotFound on reuse, got %v", err)
 		}
@@ -82,7 +82,7 @@ func TestVerifyFactorAndChallenge(t *testing.T) {
 		}
 	})
 
-	t.Run("factor 不一致の challenge は ErrChallengeNotFound", func(t *testing.T) {
+	t.Run("a challenge from a different factor returns ErrChallengeNotFound", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		u, _ := s.CreateUser("alice@example.com", hash)
@@ -95,7 +95,7 @@ func TestVerifyFactorAndChallenge(t *testing.T) {
 		}
 	})
 
-	t.Run("期限切れ challenge は ErrChallengeExpired", func(t *testing.T) {
+	t.Run("an expired challenge returns ErrChallengeExpired", func(t *testing.T) {
 		now := time.Date(2026, 5, 23, 0, 0, 0, 0, time.UTC)
 		s := New(Config{Clock: func() time.Time { return now }, ReuseInterval: 10 * time.Second})
 		hash, _ := HashPassword("password123")
@@ -111,7 +111,7 @@ func TestVerifyFactorAndChallenge(t *testing.T) {
 }
 
 func TestUpgradeSessionAAL(t *testing.T) {
-	t.Run("session を aal2 に昇格し amr に webauthn を追記する", func(t *testing.T) {
+	t.Run("promotes the session to aal2 and appends webauthn to amr", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		u, _ := s.CreateUser("alice@example.com", hash)
@@ -136,7 +136,7 @@ func TestUpgradeSessionAAL(t *testing.T) {
 		}
 	})
 
-	t.Run("存在しない session は false", func(t *testing.T) {
+	t.Run("a missing session returns false", func(t *testing.T) {
 		s := newStore()
 		if _, ok := s.UpgradeSessionAAL("nope", FactorTypeWebAuthn); ok {
 			t.Error("expected false for missing session")
@@ -145,7 +145,7 @@ func TestUpgradeSessionAAL(t *testing.T) {
 }
 
 func TestDeleteFactor(t *testing.T) {
-	t.Run("所有者の factor と紐づく challenge を削除する", func(t *testing.T) {
+	t.Run("deletes the owner's factor along with its challenges", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		u, _ := s.CreateUser("alice@example.com", hash)
@@ -163,7 +163,7 @@ func TestDeleteFactor(t *testing.T) {
 		}
 	})
 
-	t.Run("他ユーザの factor は ErrFactorNotFound", func(t *testing.T) {
+	t.Run("another user's factor returns ErrFactorNotFound", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		owner, _ := s.CreateUser("alice@example.com", hash)
@@ -177,7 +177,7 @@ func TestDeleteFactor(t *testing.T) {
 }
 
 func TestDeleteUserCascadesFactors(t *testing.T) {
-	t.Run("ユーザ削除で factor / challenge も消える", func(t *testing.T) {
+	t.Run("deleting a user also removes their factors and challenges", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		u, _ := s.CreateUser("alice@example.com", hash)
@@ -195,7 +195,7 @@ func TestDeleteUserCascadesFactors(t *testing.T) {
 }
 
 func TestSnapshotFactorsNonNil(t *testing.T) {
-	t.Run("空ストアで Factors / Challenges は非 nil の空 slice", func(t *testing.T) {
+	t.Run("Factors / Challenges are non-nil empty slices for an empty store", func(t *testing.T) {
 		s := newStore()
 		snap := s.Snapshot()
 		if snap.Factors == nil || snap.Challenges == nil {

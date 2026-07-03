@@ -9,10 +9,11 @@ import (
 	"github.com/google/uuid"
 )
 
-// challengeTTL は factor challenge の有効期限。GoTrue の既定 (MFA_CHALLENGE_EXPIRY_DURATION=300s) に合わせる。
+// challengeTTL is the factor-challenge lifetime, matching GoTrue's default
+// (MFA_CHALLENGE_EXPIRY_DURATION=300s).
 const challengeTTL = 5 * time.Minute
 
-// Factor / Challenge の状態値。GoTrue と同じ文字列を用いる。
+// Factor / Challenge status and type values. These use the same strings as GoTrue.
 const (
 	FactorStatusUnverified = "unverified"
 	FactorStatusVerified   = "verified"
@@ -27,8 +28,9 @@ var (
 	ErrChallengeExpired   = errors.New("store: challenge expired")
 )
 
-// EnrollFactor は unverified な MFA 要素を 1 件登録して複製を返す。
-// 同一ユーザ内で friendly_name が重複する場合は ErrFactorNameConflict（GoTrue と同挙動）。
+// EnrollFactor registers one unverified MFA factor and returns a clone.
+// A duplicate friendly_name for the same user yields ErrFactorNameConflict
+// (matching GoTrue's behavior).
 func (s *Store) EnrollFactor(userID, factorType, friendlyName string) (*Factor, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -58,7 +60,7 @@ func (s *Store) EnrollFactor(userID, factorType, friendlyName string) (*Factor, 
 	return cloneFactor(f), nil
 }
 
-// GetFactor は factorID から Factor の複製を返す。
+// GetFactor returns a clone of the factor for factorID.
 func (s *Store) GetFactor(factorID string) (*Factor, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -69,8 +71,9 @@ func (s *Store) GetFactor(factorID string) (*Factor, bool) {
 	return cloneFactor(f), true
 }
 
-// VerifyFactor は factor を verified に昇格させる。
-// 既に verified でも冪等に成功扱いとし（再認証フロー）、更新後の複製を返す。
+// VerifyFactor promotes the factor to verified.
+// Verifying an already-verified factor succeeds idempotently (re-authentication
+// flow); the updated clone is returned.
 func (s *Store) VerifyFactor(factorID string) (*Factor, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -83,8 +86,8 @@ func (s *Store) VerifyFactor(factorID string) (*Factor, error) {
 	return cloneFactor(f), nil
 }
 
-// DeleteFactor は userID 所有の factor と紐づく challenge を削除する。
-// 所有者不一致 / 不存在は ErrFactorNotFound。
+// DeleteFactor removes a factor owned by userID together with its challenges.
+// A missing factor or owner mismatch yields ErrFactorNotFound.
 func (s *Store) DeleteFactor(userID, factorID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -96,8 +99,9 @@ func (s *Store) DeleteFactor(userID, factorID string) error {
 	return nil
 }
 
-// deleteFactorLocked は factor と紐づく challenge を削除する。write lock 保持前提。
-// DeleteFactor（単体削除）と DeleteUser（cascade）で cascade セマンティクスを 1 箇所に集約する。
+// deleteFactorLocked removes a factor and its challenges. It assumes the write
+// lock is held and keeps the cascade semantics in one place, shared by
+// DeleteFactor (single delete) and DeleteUser (cascade).
 func (s *Store) deleteFactorLocked(factorID string) {
 	delete(s.factors, factorID)
 	for cid, ch := range s.challenges {
@@ -107,7 +111,7 @@ func (s *Store) deleteFactorLocked(factorID string) {
 	}
 }
 
-// CreateChallenge は factor に対する 1 回限りのチャレンジを発行する。
+// CreateChallenge issues a single-use challenge for a factor.
 func (s *Store) CreateChallenge(factorID string) (*Challenge, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -126,8 +130,9 @@ func (s *Store) CreateChallenge(factorID string) (*Challenge, error) {
 	return ch, nil
 }
 
-// ConsumeChallenge は challenge を検証して single-use で消費する。
-// factor 不一致は ErrChallengeNotFound、期限切れは ErrChallengeExpired（この場合も掃除する）。
+// ConsumeChallenge validates a challenge and consumes it single-use.
+// A factor mismatch yields ErrChallengeNotFound; an expired challenge yields
+// ErrChallengeExpired (and is removed as well).
 func (s *Store) ConsumeChallenge(factorID, challengeID string) (*Challenge, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -135,7 +140,8 @@ func (s *Store) ConsumeChallenge(factorID, challengeID string) (*Challenge, erro
 	if !ok || ch.FactorID != factorID {
 		return nil, ErrChallengeNotFound
 	}
-	// 期限切れは消費扱いで除去し、以後 not found に落とさず expired を明示する。
+	// Treat expiry as consumption and remove it, so later calls surface expired
+	// explicitly rather than degrading to not-found.
 	if s.clock().After(ch.ExpiresAt) {
 		delete(s.challenges, challengeID)
 		return nil, ErrChallengeExpired
@@ -145,8 +151,9 @@ func (s *Store) ConsumeChallenge(factorID, challengeID string) (*Challenge, erro
 	return &c, nil
 }
 
-// UpgradeSessionAAL は session を aal2 へ昇格させ、amr に method を追記する。
-// 同一 method の重複追記は避ける。session 不存在は ErrUserNotFound を流用せず false を返す。
+// UpgradeSessionAAL promotes a session to aal2 and appends method to its amr.
+// A method already present is not appended twice. A missing session returns
+// false rather than reusing ErrUserNotFound.
 func (s *Store) UpgradeSessionAAL(sessionID, method string) (*Session, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -168,8 +175,9 @@ func (s *Store) UpgradeSessionAAL(sessionID, method string) (*Session, bool) {
 	return cloneSession(sess), true
 }
 
-// randomChallenge は WebAuthn options に載せる base64url チャレンジ値を生成する。
-// 暗号検証には使わない（エミュレータ）ため乱数源の失敗時は UUID にフォールバックする。
+// randomChallenge generates the base64url challenge value carried in the
+// WebAuthn options. It is never used for crypto verification (this is an
+// emulator), so it falls back to a UUID if the random source fails.
 func randomChallenge() string {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {

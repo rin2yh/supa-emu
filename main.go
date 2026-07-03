@@ -43,7 +43,7 @@ func run(args []string) error {
 	mux.Handle("POST /auth/v1/token", f.Handle(handler.Token))
 	mux.Handle("GET /auth/v1/user", f.Handle(handler.GetUser))
 	mux.Handle("POST /auth/v1/logout", f.Handle(handler.Logout))
-	// passkey (WebAuthn) MFA: enroll → challenge → verify → unenroll
+	// passkey (WebAuthn) MFA: enroll -> challenge -> verify -> unenroll
 	mux.Handle("POST /auth/v1/factors", f.Handle(handler.EnrollFactor))
 	mux.Handle("POST /auth/v1/factors/{factorId}/challenge", f.Handle(handler.ChallengeFactor))
 	mux.Handle("POST /auth/v1/factors/{factorId}/verify", f.Handle(handler.VerifyFactor))

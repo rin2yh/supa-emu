@@ -96,7 +96,7 @@ func (s *Store) DeleteUser(id string) error {
 			delete(s.parentToChild, tok)
 		}
 	}
-	// MFA 要素とそれに紐づく challenge も cascade 削除する。
+	// Cascade-delete the user's MFA factors and their challenges too.
 	for fid, f := range s.factors {
 		if f.UserID == id {
 			s.deleteFactorLocked(fid)

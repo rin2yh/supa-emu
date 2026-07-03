@@ -3,9 +3,10 @@ package handler
 import "net/http"
 
 func GetUser(c *Context) {
-	// 認証分類（no_authorization / bad_jwt / session_not_found）は requireUser に集約している。
-	// no_authorization は認可ヘッダ欠落、session_not_found は署名通過後に user 消失した場合のみ。
-	// いずれも supabase-js の cookie wipe 判定に対応する。
+	// The auth classification (no_authorization / bad_jwt / session_not_found) is
+	// centralized in requireUser. no_authorization means the Authorization header
+	// is missing; session_not_found only when the user is gone after a valid
+	// signature. Both map to supabase-js's cookie-wipe decision.
 	u, _, ok := requireUser(c)
 	if !ok {
 		return

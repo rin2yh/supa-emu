@@ -18,7 +18,8 @@ type AuthConfig struct {
 	JWTIssuer      string
 	AccessTokenTTL time.Duration
 	ReuseInterval  time.Duration
-	// WebAuthn は passkey factor の Relying Party 情報。credential options に載せる。
+	// WebAuthn holds the passkey factor's Relying Party info, carried in the
+	// credential options.
 	WebAuthn WebAuthnConfig
 }
 

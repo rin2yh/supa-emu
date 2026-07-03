@@ -18,8 +18,9 @@ const apiVersion = "2024-01-01"
 
 type Func func(*Context)
 
-// WebAuthnConfig は passkey (WebAuthn) の Relying Party 情報。credential creation /
-// request options に載せる。エミュレータは署名検証をしないため値は情報提供目的。
+// WebAuthnConfig holds passkey (WebAuthn) Relying Party info carried in the
+// credential creation / request options. Since the emulator does not verify
+// signatures, the values are informational.
 type WebAuthnConfig struct {
 	RPID   string
 	RPName string
@@ -35,10 +36,12 @@ type Factory struct {
 	webauthn WebAuthnConfig
 }
 
-// FactoryOption は NewFactory の任意設定。既存呼び出し (NewFactory(st, tk)) を壊さないため可変長で受ける。
+// FactoryOption is an optional setting for NewFactory. It is variadic so existing
+// callers (NewFactory(st, tk)) keep working.
 type FactoryOption func(*Factory)
 
-// WithWebAuthn は passkey の Relying Party 設定を差し込む。未指定なら defaultWebAuthnConfig。
+// WithWebAuthn injects the passkey Relying Party settings. When unset,
+// defaultWebAuthnConfig applies.
 func WithWebAuthn(cfg WebAuthnConfig) FactoryOption {
 	return func(f *Factory) {
 		if cfg.RPID != "" {

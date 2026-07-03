@@ -11,7 +11,7 @@ import (
 	"github.com/rin2yh/supa-emu/internal/auth/store"
 )
 
-// enroll は passkey factor を登録し factor id を返すヘルパ。
+// enroll is a helper that registers a passkey factor and returns its factor id.
 func enroll(t *testing.T, f *handler.Factory, bearer string) string {
 	t.Helper()
 	req := handlertest.NewRequest(t, http.MethodPost, "/auth/v1/factors", map[string]string{
@@ -35,7 +35,7 @@ func enroll(t *testing.T, f *handler.Factory, bearer string) string {
 }
 
 func TestPasskeyFlow(t *testing.T) {
-	t.Run("enroll → challenge → verify で aal2 に昇格し factor が verified になる", func(t *testing.T) {
+	t.Run("enroll -> challenge -> verify promotes to aal2 and marks the factor verified", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)
@@ -98,7 +98,7 @@ func TestPasskeyFlow(t *testing.T) {
 			t.Errorf("amr must include webauthn: %+v", claims.AMR)
 		}
 
-		// getUser: factor が verified で現れる
+		// getUser: the factor appears as verified
 		uReq := handlertest.NewRequest(t, http.MethodGet, "/auth/v1/user", nil)
 		uReq.Header.Set("Authorization", "Bearer "+tr.AccessToken)
 		uRec := httptest.NewRecorder()
@@ -110,7 +110,7 @@ func TestPasskeyFlow(t *testing.T) {
 		}
 	})
 
-	t.Run("再認証: verified factor の challenge は request options を返す", func(t *testing.T) {
+	t.Run("re-authentication: a verified factor's challenge returns request options", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)
@@ -129,7 +129,7 @@ func TestPasskeyFlow(t *testing.T) {
 		}
 	})
 
-	t.Run("unenroll で factor が消える", func(t *testing.T) {
+	t.Run("unenroll removes the factor", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)
@@ -150,7 +150,7 @@ func TestPasskeyFlow(t *testing.T) {
 }
 
 func TestPasskeyValidation(t *testing.T) {
-	t.Run("Bearer 無しの enroll は 401 no_authorization", func(t *testing.T) {
+	t.Run("enroll without a Bearer returns 401 no_authorization", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		f := handler.NewFactory(st, handlertest.NewTokens(st, nil))
 
@@ -166,7 +166,7 @@ func TestPasskeyValidation(t *testing.T) {
 		}
 	})
 
-	t.Run("未対応 factor_type は 422 mfa_factor_type_not_supported", func(t *testing.T) {
+	t.Run("an unsupported factor_type returns 422 mfa_factor_type_not_supported", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)
@@ -184,7 +184,7 @@ func TestPasskeyValidation(t *testing.T) {
 		}
 	})
 
-	t.Run("friendly_name 重複は 422 mfa_factor_name_conflict", func(t *testing.T) {
+	t.Run("a duplicate friendly_name returns 422 mfa_factor_name_conflict", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)
@@ -205,7 +205,7 @@ func TestPasskeyValidation(t *testing.T) {
 		}
 	})
 
-	t.Run("存在しない challenge_id での verify は 404 mfa_challenge_not_found", func(t *testing.T) {
+	t.Run("verify with an unknown challenge_id returns 404 mfa_challenge_not_found", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)
@@ -226,7 +226,7 @@ func TestPasskeyValidation(t *testing.T) {
 		}
 	})
 
-	t.Run("他ユーザの factor への challenge は 404 mfa_factor_not_found", func(t *testing.T) {
+	t.Run("challenging another user's factor returns 404 mfa_factor_not_found", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)

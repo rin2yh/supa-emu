@@ -17,8 +17,9 @@ type Store struct {
 	// 旧実装は ConsumeRefreshToken の reuse パスで全件走査だったため、長寿命プロセスで
 	// O(N) スキャンがロック競合の原因になっていた。
 	parentToChild map[string]string
-	// factors は factorID -> Factor。user.Factors は cloneUser で本 map から導出するため、
-	// 要素の唯一の真実はここに集約される。challenges は challengeID -> Challenge。
+	// factors maps factorID -> Factor. user.Factors is derived from this map in
+	// cloneUser, so this map is the single source of truth for factors.
+	// challenges maps challengeID -> Challenge.
 	factors    map[string]*Factor
 	challenges map[string]*Challenge
 

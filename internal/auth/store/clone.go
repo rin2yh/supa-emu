@@ -20,14 +20,15 @@ func (s *Store) cloneUser(u *User) *User {
 	if u.PasswordHash != nil {
 		c.PasswordHash = append([]byte(nil), u.PasswordHash...)
 	}
-	// Factor は factors map が唯一の真実。ここで CreatedAt 昇順に導出して埋める。
+	// The factors map is the single source of truth; derive and fill the user's
+	// factors here, ordered by CreatedAt.
 	c.Factors = s.userFactorsLocked(u.ID)
 	return &c
 }
 
-// userFactorsLocked は user に紐づく Factor を CreatedAt 昇順（同時刻は ID 昇順）で clone する。
-// read/write いずれかのロック保持を前提とする。要素が無くても非 nil の空 slice を返し、
-// supabase-js の user.factors が null にならないようにする。
+// userFactorsLocked clones the user's factors ordered by CreatedAt (ties broken
+// by ID). It assumes either the read or write lock is held. It returns a non-nil
+// empty slice even with no factors, so supabase-js's user.factors is never null.
 func (s *Store) userFactorsLocked(userID string) []Factor {
 	out := make([]Factor, 0)
 	for _, f := range s.factors {

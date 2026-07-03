@@ -45,8 +45,9 @@ func (s *Store) createSessionLocked(userID string) (*Session, error) {
 		ID:        uuid.NewString(),
 		UserID:    userID,
 		CreatedAt: now,
-		// password ログイン由来なので aal1 / amr=[password] で初期化する。
-		// passkey verify で aal2 へ昇格するまではこの値を JWT に載せる。
+		// Sessions originate from a password login, so initialize them with
+		// aal1 / amr=[password]. This is what the JWT carries until a passkey
+		// verify promotes the session to aal2.
 		AAL: "aal1",
 		AMR: []AMREntry{{Method: "password", Timestamp: now.Unix()}},
 	}
@@ -54,7 +55,8 @@ func (s *Store) createSessionLocked(userID string) (*Session, error) {
 	return cloneSession(sess), nil
 }
 
-// GetSession は session の複製を返す。JWT の aal / amr claim を Build 時に読み出すために使う。
+// GetSession returns a clone of the session. Build uses it to read the aal / amr
+// claims when issuing a JWT.
 func (s *Store) GetSession(sessionID string) (*Session, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

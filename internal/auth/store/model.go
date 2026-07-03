@@ -14,8 +14,8 @@ type User struct {
 	AppMetadata      map[string]any `json:"app_metadata"`
 	UserMetadata     map[string]any `json:"user_metadata"`
 	Identities       []Identity     `json:"identities"`
-	// Factors は supabase-js の mfa.listFactors() が参照する MFA 要素一覧。
-	// GetUser / Snapshot でユーザに紐づく Factor を CreatedAt 昇順で埋める。
+	// Factors is the list of MFA factors read by supabase-js mfa.listFactors().
+	// GetUser / Snapshot fill in the user's factors ordered by CreatedAt.
 	Factors   []Factor  `json:"factors"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -47,22 +47,25 @@ type Session struct {
 	ID        string    `json:"id"`
 	UserID    string    `json:"user_id"`
 	CreatedAt time.Time `json:"created_at"`
-	// AAL は session の Authenticator Assurance Level。password ログイン直後は "aal1"、
-	// MFA (passkey/webauthn) verify 後に "aal2" へ昇格する。JWT の aal claim の出所。
+	// AAL is the session's Authenticator Assurance Level: "aal1" right after a
+	// password login, promoted to "aal2" after an MFA (passkey/webauthn) verify.
+	// It is the source of the JWT aal claim.
 	AAL string `json:"aal"`
-	// AMR は認証手段の履歴 (Authentication Methods References)。JWT の amr claim になり、
-	// supabase-js の getAuthenticatorAssuranceLevel が currentAuthenticationMethods を導出する。
+	// AMR is the Authentication Methods References history. It becomes the JWT
+	// amr claim, from which supabase-js getAuthenticatorAssuranceLevel derives
+	// currentAuthenticationMethods.
 	AMR []AMREntry `json:"amr,omitempty"`
 }
 
-// AMREntry は 1 回の認証イベント（method と発生時刻）を表す。
+// AMREntry represents a single authentication event (method and timestamp).
 type AMREntry struct {
 	Method    string `json:"method"`
 	Timestamp int64  `json:"timestamp"`
 }
 
-// Factor は MFA 要素。本エミュレータは factor_type "webauthn"（passkey）のみを実装する。
-// GoTrue の user.factors と同じく friendly_name / factor_type / status を公開する。
+// Factor is an MFA factor. This emulator only implements factor_type "webauthn"
+// (passkey). Like GoTrue's user.factors it exposes friendly_name / factor_type /
+// status.
 type Factor struct {
 	ID           string    `json:"id"`
 	UserID       string    `json:"-"`
@@ -73,7 +76,8 @@ type Factor struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
-// Challenge は factor に対する 1 回限りの検証チャレンジ。ExpiresAt 経過後は無効。
+// Challenge is a single-use verification challenge for a factor, invalid once
+// ExpiresAt has passed.
 type Challenge struct {
 	ID        string    `json:"id"`
 	FactorID  string    `json:"factor_id"`

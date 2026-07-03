@@ -9,14 +9,17 @@ import (
 	"github.com/rin2yh/supa-emu/internal/auth/store"
 )
 
-// passkey (WebAuthn) MFA を GoTrue の /auth/v1/factors 系エンドポイント互換で提供する。
+// Passkey (WebAuthn) MFA, served over GoTrue's /auth/v1/factors endpoints.
 //
-// エミュレータのため WebAuthn の attestation / assertion 署名は検証しない。credential は
-// そのまま受理し、フロー（enroll → challenge → verify → unenroll）と AAL 昇格の HTTP 契約を
-// supabase-js の auth.mfa.* / getAuthenticatorAssuranceLevel と揃えることを目的とする。
+// Because this is an emulator, WebAuthn attestation / assertion signatures are
+// not verified: the credential is accepted as-is. The goal is to match the HTTP
+// contract of the flow (enroll -> challenge -> verify -> unenroll) and the AAL
+// upgrade with supabase-js auth.mfa.* / getAuthenticatorAssuranceLevel.
 
-// requireUser は Bearer を検証し認証済み user と claims を返す。失敗時はエラー応答済みで ok=false。
-// GetUser と同じ error_code 分類（no_authorization / bad_jwt / session_not_found）を共有する。
+// requireUser verifies the Bearer token and returns the authenticated user and
+// claims. On failure it has already written the error response and returns
+// ok=false. It shares GetUser's error_code classification
+// (no_authorization / bad_jwt / session_not_found).
 func requireUser(c *Context) (*store.User, *Claims, bool) {
 	token := c.Bearer()
 	if token == "" {
@@ -43,8 +46,9 @@ type enrollFactorRequest struct {
 	FriendlyName string `json:"friendly_name"`
 }
 
-// EnrollFactor は passkey を登録する（POST /auth/v1/factors）。
-// factor は unverified で作られ、WebAuthn credential creation options を添えて返す。
+// EnrollFactor registers a passkey (POST /auth/v1/factors).
+// The factor is created unverified and returned with WebAuthn credential
+// creation options.
 func EnrollFactor(c *Context) {
 	u, _, ok := requireUser(c)
 	if !ok {
@@ -55,7 +59,7 @@ func EnrollFactor(c *Context) {
 		c.Error(http.StatusBadRequest, "invalid request body")
 		return
 	}
-	// 本エミュレータは passkey (webauthn) のみ実装する。空指定は webauthn とみなす。
+	// This emulator only implements passkey (webauthn); treat an empty value as webauthn.
 	factorType := strings.TrimSpace(req.FactorType)
 	if factorType == "" {
 		factorType = store.FactorTypeWebAuthn
@@ -91,9 +95,10 @@ func EnrollFactor(c *Context) {
 	})
 }
 
-// ChallengeFactor は factor に対する検証チャレンジを発行する
-// （POST /auth/v1/factors/{factorId}/challenge）。unverified なら登録用の creation options、
-// verified なら認証用の request options を添えて返す。
+// ChallengeFactor issues a verification challenge for a factor
+// (POST /auth/v1/factors/{factorId}/challenge). It returns creation options for
+// registration when the factor is unverified, and request options for
+// authentication when it is verified.
 func ChallengeFactor(c *Context) {
 	u, _, ok := requireUser(c)
 	if !ok {
@@ -132,13 +137,15 @@ func ChallengeFactor(c *Context) {
 
 type verifyFactorRequest struct {
 	ChallengeID string `json:"challenge_id"`
-	// WebAuthn の登録/認証応答。エミュレータは署名検証しないため任意の JSON を受理する。
+	// The WebAuthn registration/authentication response. The emulator does not
+	// verify signatures, so any JSON is accepted.
 	CredentialResponse any `json:"credential_response"`
 }
 
-// VerifyFactor は challenge を消費し passkey を検証する
-// （POST /auth/v1/factors/{factorId}/verify）。成功で factor を verified に昇格させ、
-// 現在の session を aal2 へ引き上げた新しい access_token / refresh_token を返す。
+// VerifyFactor consumes a challenge and verifies a passkey
+// (POST /auth/v1/factors/{factorId}/verify). On success it promotes the factor
+// to verified and returns a new access_token / refresh_token with the current
+// session upgraded to aal2.
 func VerifyFactor(c *Context) {
 	u, claims, ok := requireUser(c)
 	if !ok {
@@ -172,7 +179,7 @@ func VerifyFactor(c *Context) {
 		return
 	}
 
-	// credential_response は emulator では署名検証しないため、受理するだけで verify に進む。
+	// The emulator does not verify credential_response signatures, so accept it and proceed.
 	if _, err := c.store.VerifyFactor(factorID); err != nil {
 		if errors.Is(err, store.ErrFactorNotFound) {
 			c.ErrorCode(http.StatusNotFound, "mfa_factor_not_found", "MFA factor not found")
@@ -182,7 +189,8 @@ func VerifyFactor(c *Context) {
 		return
 	}
 
-	// 現在の session を aal2 へ昇格し、同一 session で refresh_token を rotate した新ペアを返す。
+	// Upgrade the current session to aal2 and return a new pair by rotating the
+	// refresh_token within the same session.
 	if claims.SessionID == "" {
 		c.ErrorCode(http.StatusUnauthorized, "session_not_found",
 			"AuthSessionMissingError: Auth session missing!")
@@ -198,7 +206,7 @@ func VerifyFactor(c *Context) {
 		c.Error(http.StatusInternalServerError, err.Error())
 		return
 	}
-	// factor が verified になった状態を反映するため user を読み直す。
+	// Re-read the user so the response reflects the now-verified factor.
 	fresh, ok := c.store.FindUserByID(u.ID)
 	if !ok {
 		c.ErrorCode(http.StatusUnauthorized, "session_not_found",
@@ -213,7 +221,7 @@ func VerifyFactor(c *Context) {
 	c.JSON(http.StatusOK, tr)
 }
 
-// UnenrollFactor は passkey を削除する（DELETE /auth/v1/factors/{factorId}）。
+// UnenrollFactor deletes a passkey (DELETE /auth/v1/factors/{factorId}).
 func UnenrollFactor(c *Context) {
 	u, _, ok := requireUser(c)
 	if !ok {
@@ -227,8 +235,9 @@ func UnenrollFactor(c *Context) {
 	c.JSON(http.StatusOK, map[string]any{"id": factorID})
 }
 
-// credentialCreationOptions は WebAuthn 登録 ceremony 用の PublicKeyCredentialCreationOptions
-// 相当の JSON を組み立てる。エミュレータでは検証されないが構造的に妥当な形を返す。
+// credentialCreationOptions builds JSON equivalent to a WebAuthn registration
+// ceremony's PublicKeyCredentialCreationOptions. It is not verified by the
+// emulator but is returned in a structurally valid shape.
 func (c *Context) credentialCreationOptions(u *store.User, challenge string) map[string]any {
 	return map[string]any{
 		"publicKey": map[string]any{
@@ -256,8 +265,8 @@ func (c *Context) credentialCreationOptions(u *store.User, challenge string) map
 	}
 }
 
-// credentialRequestOptions は WebAuthn 認証 ceremony 用の PublicKeyCredentialRequestOptions
-// 相当の JSON を組み立てる。
+// credentialRequestOptions builds JSON equivalent to a WebAuthn authentication
+// ceremony's PublicKeyCredentialRequestOptions.
 func (c *Context) credentialRequestOptions(challenge string) map[string]any {
 	return map[string]any{
 		"publicKey": map[string]any{
