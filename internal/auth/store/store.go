@@ -22,6 +22,12 @@ type Store struct {
 	// challenges maps challengeID -> Challenge.
 	factors    map[string]*Factor
 	challenges map[string]*Challenge
+	// passkeys maps passkeyID -> Passkey (passwordless credentials). passkeyByCred
+	// indexes credentialID -> passkeyID for O(1) authentication lookup.
+	// passkeyChallenges maps challengeID -> PasskeyChallenge.
+	passkeys          map[string]*Passkey
+	passkeyByCred     map[string]string
+	passkeyChallenges map[string]*PasskeyChallenge
 
 	clock         func() time.Time
 	reuseInterval time.Duration
@@ -46,15 +52,18 @@ func New(cfg Config) *Store {
 		cfg.ReuseInterval = 10 * time.Second
 	}
 	return &Store{
-		users:         make(map[string]*User),
-		emailIndex:    make(map[string]string),
-		sessions:      make(map[string]*Session),
-		refreshTokens: make(map[string]*RefreshToken),
-		parentToChild: make(map[string]string),
-		factors:       make(map[string]*Factor),
-		challenges:    make(map[string]*Challenge),
-		clock:         cfg.Clock,
-		reuseInterval: cfg.ReuseInterval,
+		users:             make(map[string]*User),
+		emailIndex:        make(map[string]string),
+		sessions:          make(map[string]*Session),
+		refreshTokens:     make(map[string]*RefreshToken),
+		parentToChild:     make(map[string]string),
+		factors:           make(map[string]*Factor),
+		challenges:        make(map[string]*Challenge),
+		passkeys:          make(map[string]*Passkey),
+		passkeyByCred:     make(map[string]string),
+		passkeyChallenges: make(map[string]*PasskeyChallenge),
+		clock:             cfg.Clock,
+		reuseInterval:     cfg.ReuseInterval,
 	}
 }
 
@@ -68,6 +77,9 @@ func (s *Store) Reset() {
 	s.parentToChild = make(map[string]string)
 	s.factors = make(map[string]*Factor)
 	s.challenges = make(map[string]*Challenge)
+	s.passkeys = make(map[string]*Passkey)
+	s.passkeyByCred = make(map[string]string)
+	s.passkeyChallenges = make(map[string]*PasskeyChallenge)
 }
 
 func (s *Store) Snapshot() Snapshot {
@@ -79,6 +91,7 @@ func (s *Store) Snapshot() Snapshot {
 		RefreshTokens: []RefreshToken{},
 		Factors:       []Factor{},
 		Challenges:    []Challenge{},
+		Passkeys:      []Passkey{},
 	}
 	for _, u := range s.users {
 		snap.Users = append(snap.Users, *s.cloneUser(u))
@@ -94,6 +107,9 @@ func (s *Store) Snapshot() Snapshot {
 	}
 	for _, ch := range s.challenges {
 		snap.Challenges = append(snap.Challenges, *ch)
+	}
+	for _, pk := range s.passkeys {
+		snap.Passkeys = append(snap.Passkeys, *pk)
 	}
 	return snap
 }

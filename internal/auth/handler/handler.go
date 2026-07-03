@@ -27,7 +27,7 @@ type WebAuthnConfig struct {
 }
 
 func defaultWebAuthnConfig() WebAuthnConfig {
-	return WebAuthnConfig{RPID: "localhost", RPName: "supa-emu"}
+	return WebAuthnConfig{RPID: "127.0.0.1", RPName: "supa-emu"}
 }
 
 type Factory struct {

@@ -94,7 +94,15 @@ func (t *Tokens) keyFunc(tok *jwtv5.Token) (any, error) {
 // store.IssueSession で CreateSession + IssueRefreshToken を 1 ロックで実行することで、
 // 並行 DeleteUser が走っても session 単独の leak が発生しない。
 func (t *Tokens) Issue(u *store.User) (*TokenResponse, error) {
-	sess, rt, err := t.store.IssueSession(u.ID)
+	return t.IssueWithMethod(u, "password")
+}
+
+// IssueWithMethod issues a session whose amr records the given authentication
+// method ("webauthn" for a passwordless passkey login). The access_token is
+// signed with the same key as a password login, so app-side local JWT
+// verification (getClaims) accepts it regardless of the login method.
+func (t *Tokens) IssueWithMethod(u *store.User, method string) (*TokenResponse, error) {
+	sess, rt, err := t.store.IssueSessionWithMethod(u.ID, method)
 	if err != nil {
 		return nil, err
 	}

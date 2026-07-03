@@ -43,11 +43,16 @@ func run(args []string) error {
 	mux.Handle("POST /auth/v1/token", f.Handle(handler.Token))
 	mux.Handle("GET /auth/v1/user", f.Handle(handler.GetUser))
 	mux.Handle("POST /auth/v1/logout", f.Handle(handler.Logout))
-	// passkey (WebAuthn) MFA: enroll -> challenge -> verify -> unenroll
+	// WebAuthn MFA (second factor): enroll -> challenge -> verify -> unenroll
 	mux.Handle("POST /auth/v1/factors", f.Handle(handler.EnrollFactor))
 	mux.Handle("POST /auth/v1/factors/{factorId}/challenge", f.Handle(handler.ChallengeFactor))
 	mux.Handle("POST /auth/v1/factors/{factorId}/verify", f.Handle(handler.VerifyFactor))
 	mux.Handle("DELETE /auth/v1/factors/{factorId}", f.Handle(handler.UnenrollFactor))
+	// Passwordless passkeys (primary auth): registration + authentication ceremonies
+	mux.Handle("POST /auth/v1/passkeys/registration/options", f.Handle(handler.PasskeyRegistrationOptions))
+	mux.Handle("POST /auth/v1/passkeys/registration/verify", f.Handle(handler.PasskeyRegistrationVerify))
+	mux.Handle("POST /auth/v1/passkeys/authentication/options", f.Handle(handler.PasskeyAuthenticationOptions))
+	mux.Handle("POST /auth/v1/passkeys/authentication/verify", f.Handle(handler.PasskeyAuthenticationVerify))
 	mux.Handle("GET /auth/v1/admin/users", f.Handle(handler.AdminListUsers))
 	mux.Handle("DELETE /auth/v1/admin/users/{id}", f.Handle(handler.AdminDeleteUser))
 	mux.Handle("POST /__emulator/reset", f.Handle(handler.Reset))

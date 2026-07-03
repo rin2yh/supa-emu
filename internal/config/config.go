@@ -36,8 +36,11 @@ func Default() Config {
 			JWTIssuer:      "http://127.0.0.1:54321/auth/v1",
 			AccessTokenTTL: time.Hour,
 			ReuseInterval:  10 * time.Second,
+			// Default the RP id to the emulator's own listen host so passkey
+			// ceremonies match a local E2E origin (http://127.0.0.1:PORT) out of
+			// the box. Override with -webauthn-rp-id when serving another host.
 			WebAuthn: WebAuthnConfig{
-				RPID:   "localhost",
+				RPID:   "127.0.0.1",
 				RPName: "supa-emu",
 			},
 		},

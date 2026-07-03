@@ -27,7 +27,7 @@ go build -o bin/supa-emu .
 | `-jwt-issuer` | - | `http://127.0.0.1:54321/auth/v1` |
 | `-access-token-ttl` | - | `1h` |
 | `-refresh-reuse-interval` | - | `10s` |
-| `-webauthn-rp-id` | - | `localhost` |
+| `-webauthn-rp-id` | - | `127.0.0.1` |
 | `-webauthn-rp-name` | - | `supa-emu` |
 
 CLI flags take precedence over environment variables.
@@ -53,13 +53,28 @@ Inputs: `version` (default `latest`), `addr` (default `127.0.0.1:54321`), `jwt-s
 
 ## Endpoints
 
-Supports `/auth/v1/*` (health, settings, signup, token, user, logout, factors, admin/users) plus `/__emulator/*` test helpers (reset, snapshot, users). Unmatched paths return `404`.
+Supports `/auth/v1/*` (health, settings, signup, token, user, logout, factors, passkeys, admin/users) plus `/__emulator/*` test helpers (reset, snapshot, users). Unmatched paths return `404`.
 
 In-memory only, no apikey validation, HS256 fixed. OAuth / Phone / TOTP / email / Realtime / Storage are out of scope.
 
-## Passkey (WebAuthn MFA)
+The emulator implements **two distinct WebAuthn features** — they share the `-webauthn-rp-*` Relying Party settings but are otherwise separate: passwordless passkeys are a primary login, WebAuthn factors are a second factor. Because there is no real authenticator, neither verifies attestation/assertion signatures.
 
-Emulates the GoTrue passkey factor API so `supabase.auth.mfa.*` and `getAuthenticatorAssuranceLevel()` can be exercised in tests. All endpoints require a Bearer access token.
+## Passwordless passkeys (`auth.passkey.*`)
+
+A passkey is the login itself: `authentication/verify` issues a **new session** from an unauthenticated request (not an `aal2` upgrade). Authentication matches the presented credential id against one persisted at registration, so a client must register before it can authenticate. The `access_token` is signed with the same key as a password login, so app-side `getClaims()` accepts it.
+
+| Method | Path | supabase-js | Response |
+|--------|------|-------------|----------|
+| `POST` | `/auth/v1/passkeys/registration/options` | `passkey.register` (Bearer) | `{ challenge_id, options, expires_at }` |
+| `POST` | `/auth/v1/passkeys/registration/verify` | body `{ challenge_id, credential }` (Bearer) | `{ id, friendly_name?, created_at }` |
+| `POST` | `/auth/v1/passkeys/authentication/options` | `passkey.signIn` (no auth) | `{ challenge_id, options, expires_at }` |
+| `POST` | `/auth/v1/passkeys/authentication/verify` | body `{ challenge_id, credential }` (no auth) | `{ session, user }` |
+
+Challenges are single-use with a 5&nbsp;min TTL. Registration options require a Bearer token; authentication options are discoverable (no auth). The RP id defaults to `127.0.0.1` to match a local E2E origin (`http://127.0.0.1:PORT`).
+
+## WebAuthn MFA factors (`auth.mfa.*`)
+
+A second factor that upgrades an existing session to `aal2`; also drives `getAuthenticatorAssuranceLevel()`. All endpoints require a Bearer access token.
 
 | Method | Path | supabase-js |
 |--------|------|-------------|
@@ -70,7 +85,7 @@ Emulates the GoTrue passkey factor API so `supabase.auth.mfa.*` and `getAuthenti
 
 Flow: `enroll` creates an `unverified` factor and returns `credential_creation_options`; `challenge` issues a single-use challenge (5&nbsp;min TTL) with creation options (registration) or request options (authentication); `verify` consumes the challenge, marks the factor `verified`, upgrades the session to `aal2`, and returns a rotated `access_token` / `refresh_token`. Factors appear on `GET /auth/v1/user` under `factors`, backing `mfa.listFactors()`.
 
-Because there is no real authenticator, the emulator does **not** verify WebAuthn attestation/assertion signatures — any `credential_response` is accepted. Relying Party defaults (`localhost` / `supa-emu`) are overridable via `-webauthn-rp-id`, `-webauthn-rp-name`.
+Relying Party defaults (`127.0.0.1` / `supa-emu`) are overridable via `-webauthn-rp-id`, `-webauthn-rp-name`.
 
 ## License
 

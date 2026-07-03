@@ -86,6 +86,33 @@ type Challenge struct {
 	ExpiresAt time.Time `json:"expires_at"`
 }
 
+// Passkey is a passwordless (primary-authentication) WebAuthn credential, as
+// used by supabase-js auth.passkey.*. Unlike Factor (a second factor promoting a
+// session to aal2), a passkey authenticates a login from scratch.
+type Passkey struct {
+	ID           string `json:"id"`
+	UserID       string `json:"user_id"`
+	FriendlyName string `json:"friendly_name,omitempty"`
+	CredentialID string `json:"credential_id"`
+	// PublicKey is opaque in the emulator: authentication is matched by
+	// CredentialID rather than by verifying a real signature.
+	PublicKey string    `json:"-"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// PasskeyChallenge is a single-use passkey ceremony challenge. Registration
+// challenges carry the authenticated UserID; authentication challenges are
+// discoverable (no user yet), so UserID is empty.
+type PasskeyChallenge struct {
+	ID           string    `json:"id"`
+	UserID       string    `json:"user_id,omitempty"`
+	Purpose      string    `json:"purpose"`
+	FriendlyName string    `json:"friendly_name,omitempty"`
+	Value        string    `json:"value"`
+	CreatedAt    time.Time `json:"created_at"`
+	ExpiresAt    time.Time `json:"expires_at"`
+}
+
 // /__emulator/snapshot で JSON 化される前提のため snake_case + 空 slice を担保する。
 type Snapshot struct {
 	Users         []User         `json:"users"`
@@ -93,4 +120,5 @@ type Snapshot struct {
 	RefreshTokens []RefreshToken `json:"refresh_tokens"`
 	Factors       []Factor       `json:"factors"`
 	Challenges    []Challenge    `json:"challenges"`
+	Passkeys      []Passkey      `json:"passkeys"`
 }
