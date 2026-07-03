@@ -71,9 +71,6 @@ type Factor struct {
 	Status       string    `json:"status"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
-	// WebAuthnCredential は verify 時に受領した credential の識別子。
-	// エミュレータは署名検証を行わないため保持のみで、認証判定には使わない。
-	WebAuthnCredential string `json:"-"`
 }
 
 // Challenge は factor に対する 1 回限りの検証チャレンジ。ExpiresAt 経過後は無効。

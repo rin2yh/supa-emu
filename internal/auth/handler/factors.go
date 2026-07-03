@@ -86,7 +86,7 @@ func EnrollFactor(c *Context) {
 		"type":          f.FactorType,
 		"friendly_name": f.FriendlyName,
 		"web_authn": map[string]any{
-			"credential_creation_options": c.credentialCreationOptions(u, store.Challenge{Value: base64.RawURLEncoding.EncodeToString([]byte(f.ID))}),
+			"credential_creation_options": c.credentialCreationOptions(u, base64.RawURLEncoding.EncodeToString([]byte(f.ID))),
 		},
 	})
 }
@@ -118,9 +118,9 @@ func ChallengeFactor(c *Context) {
 
 	webAuthn := map[string]any{}
 	if f.Status == store.FactorStatusVerified {
-		webAuthn["credential_request_options"] = c.credentialRequestOptions(*ch)
+		webAuthn["credential_request_options"] = c.credentialRequestOptions(ch.Value)
 	} else {
-		webAuthn["credential_creation_options"] = c.credentialCreationOptions(u, *ch)
+		webAuthn["credential_creation_options"] = c.credentialCreationOptions(u, ch.Value)
 	}
 	c.JSON(http.StatusOK, map[string]any{
 		"id":         ch.ID,
@@ -172,12 +172,8 @@ func VerifyFactor(c *Context) {
 		return
 	}
 
-	// credential_response は emulator では検証しないが、あれば識別子として記録しておく。
-	credential := ""
-	if req.CredentialResponse != nil {
-		credential = base64.RawURLEncoding.EncodeToString([]byte(req.ChallengeID))
-	}
-	if _, err := c.store.VerifyFactor(factorID, credential); err != nil {
+	// credential_response は emulator では署名検証しないため、受理するだけで verify に進む。
+	if _, err := c.store.VerifyFactor(factorID); err != nil {
 		if errors.Is(err, store.ErrFactorNotFound) {
 			c.ErrorCode(http.StatusNotFound, "mfa_factor_not_found", "MFA factor not found")
 			return
@@ -233,10 +229,10 @@ func UnenrollFactor(c *Context) {
 
 // credentialCreationOptions は WebAuthn 登録 ceremony 用の PublicKeyCredentialCreationOptions
 // 相当の JSON を組み立てる。エミュレータでは検証されないが構造的に妥当な形を返す。
-func (c *Context) credentialCreationOptions(u *store.User, ch store.Challenge) map[string]any {
+func (c *Context) credentialCreationOptions(u *store.User, challenge string) map[string]any {
 	return map[string]any{
 		"publicKey": map[string]any{
-			"challenge": ch.Value,
+			"challenge": challenge,
 			"rp": map[string]any{
 				"id":   c.webauthn.RPID,
 				"name": c.webauthn.RPName,
@@ -262,10 +258,10 @@ func (c *Context) credentialCreationOptions(u *store.User, ch store.Challenge) m
 
 // credentialRequestOptions は WebAuthn 認証 ceremony 用の PublicKeyCredentialRequestOptions
 // 相当の JSON を組み立てる。
-func (c *Context) credentialRequestOptions(ch store.Challenge) map[string]any {
+func (c *Context) credentialRequestOptions(challenge string) map[string]any {
 	return map[string]any{
 		"publicKey": map[string]any{
-			"challenge":        ch.Value,
+			"challenge":        challenge,
 			"rpId":             c.webauthn.RPID,
 			"timeout":          60000,
 			"userVerification": "preferred",

@@ -29,7 +29,6 @@ go build -o bin/supa-emu .
 | `-refresh-reuse-interval` | - | `10s` |
 | `-webauthn-rp-id` | - | `localhost` |
 | `-webauthn-rp-name` | - | `supa-emu` |
-| `-webauthn-rp-origin` | - | `http://localhost:3000` |
 
 CLI flags take precedence over environment variables.
 
@@ -71,7 +70,7 @@ Emulates the GoTrue passkey factor API so `supabase.auth.mfa.*` and `getAuthenti
 
 Flow: `enroll` creates an `unverified` factor and returns `credential_creation_options`; `challenge` issues a single-use challenge (5&nbsp;min TTL) with creation options (registration) or request options (authentication); `verify` consumes the challenge, marks the factor `verified`, upgrades the session to `aal2`, and returns a rotated `access_token` / `refresh_token`. Factors appear on `GET /auth/v1/user` under `factors`, backing `mfa.listFactors()`.
 
-Because there is no real authenticator, the emulator does **not** verify WebAuthn attestation/assertion signatures — any `credential_response` is accepted. Relying Party defaults (`localhost` / `supa-emu` / `http://localhost:3000`) are overridable via `-webauthn-rp-id`, `-webauthn-rp-name`, `-webauthn-rp-origin`.
+Because there is no real authenticator, the emulator does **not** verify WebAuthn attestation/assertion signatures — any `credential_response` is accepted. Relying Party defaults (`localhost` / `supa-emu`) are overridable via `-webauthn-rp-id`, `-webauthn-rp-name`.
 
 ## License
 

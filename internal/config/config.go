@@ -23,9 +23,8 @@ type AuthConfig struct {
 }
 
 type WebAuthnConfig struct {
-	RPID     string
-	RPName   string
-	RPOrigin string
+	RPID   string
+	RPName string
 }
 
 func Default() Config {
@@ -37,9 +36,8 @@ func Default() Config {
 			AccessTokenTTL: time.Hour,
 			ReuseInterval:  10 * time.Second,
 			WebAuthn: WebAuthnConfig{
-				RPID:     "localhost",
-				RPName:   "supa-emu",
-				RPOrigin: "http://localhost:3000",
+				RPID:   "localhost",
+				RPName: "supa-emu",
 			},
 		},
 	}
@@ -66,7 +64,6 @@ func Parse(args []string) (Config, error) {
 	fs.DurationVar(&cfg.Auth.ReuseInterval, "refresh-reuse-interval", cfg.Auth.ReuseInterval, "refresh_token reuse interval")
 	fs.StringVar(&cfg.Auth.WebAuthn.RPID, "webauthn-rp-id", cfg.Auth.WebAuthn.RPID, "WebAuthn Relying Party ID (passkey)")
 	fs.StringVar(&cfg.Auth.WebAuthn.RPName, "webauthn-rp-name", cfg.Auth.WebAuthn.RPName, "WebAuthn Relying Party name (passkey)")
-	fs.StringVar(&cfg.Auth.WebAuthn.RPOrigin, "webauthn-rp-origin", cfg.Auth.WebAuthn.RPOrigin, "WebAuthn Relying Party origin (passkey)")
 
 	if err := fs.Parse(args); err != nil {
 		return cfg, err

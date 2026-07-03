@@ -116,7 +116,7 @@ func TestPasskeyFlow(t *testing.T) {
 		f := handler.NewFactory(st, tk)
 		seeded := handlertest.Seed(t, st, tk, "alice@example.com", "password123")
 		factorID := enroll(t, f, seeded.AccessToken)
-		if _, err := st.VerifyFactor(factorID, "cred"); err != nil {
+		if _, err := st.VerifyFactor(factorID); err != nil {
 			t.Fatalf("VerifyFactor: %v", err)
 		}
 

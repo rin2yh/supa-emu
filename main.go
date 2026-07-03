@@ -32,9 +32,8 @@ func run(args []string) error {
 	st := store.New(store.Config{Clock: clock, ReuseInterval: cfg.Auth.ReuseInterval})
 	tk := handler.NewTokens(st, cfg.Auth.JWTSecret, cfg.Auth.JWTIssuer, cfg.Auth.AccessTokenTTL, clock)
 	f := handler.NewFactory(st, tk, handler.WithWebAuthn(handler.WebAuthnConfig{
-		RPID:     cfg.Auth.WebAuthn.RPID,
-		RPName:   cfg.Auth.WebAuthn.RPName,
-		RPOrigin: cfg.Auth.WebAuthn.RPOrigin,
+		RPID:   cfg.Auth.WebAuthn.RPID,
+		RPName: cfg.Auth.WebAuthn.RPName,
 	}))
 
 	mux := http.NewServeMux()

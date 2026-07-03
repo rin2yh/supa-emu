@@ -69,9 +69,9 @@ func (s *Store) GetFactor(factorID string) (*Factor, bool) {
 	return cloneFactor(f), true
 }
 
-// VerifyFactor は factor を verified に昇格させ、受領した credential 識別子を記録する。
+// VerifyFactor は factor を verified に昇格させる。
 // 既に verified でも冪等に成功扱いとし（再認証フロー）、更新後の複製を返す。
-func (s *Store) VerifyFactor(factorID, credential string) (*Factor, error) {
+func (s *Store) VerifyFactor(factorID string) (*Factor, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	f, ok := s.factors[factorID]
@@ -79,9 +79,6 @@ func (s *Store) VerifyFactor(factorID, credential string) (*Factor, error) {
 		return nil, ErrFactorNotFound
 	}
 	f.Status = FactorStatusVerified
-	if credential != "" {
-		f.WebAuthnCredential = credential
-	}
 	f.UpdatedAt = s.clock()
 	return cloneFactor(f), nil
 }
@@ -95,13 +92,19 @@ func (s *Store) DeleteFactor(userID, factorID string) error {
 	if !ok || f.UserID != userID {
 		return ErrFactorNotFound
 	}
+	s.deleteFactorLocked(factorID)
+	return nil
+}
+
+// deleteFactorLocked は factor と紐づく challenge を削除する。write lock 保持前提。
+// DeleteFactor（単体削除）と DeleteUser（cascade）で cascade セマンティクスを 1 箇所に集約する。
+func (s *Store) deleteFactorLocked(factorID string) {
 	delete(s.factors, factorID)
 	for cid, ch := range s.challenges {
 		if ch.FactorID == factorID {
 			delete(s.challenges, cid)
 		}
 	}
-	return nil
 }
 
 // CreateChallenge は factor に対する 1 回限りのチャレンジを発行する。

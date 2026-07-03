@@ -21,13 +21,12 @@ type Func func(*Context)
 // WebAuthnConfig は passkey (WebAuthn) の Relying Party 情報。credential creation /
 // request options に載せる。エミュレータは署名検証をしないため値は情報提供目的。
 type WebAuthnConfig struct {
-	RPID     string
-	RPName   string
-	RPOrigin string
+	RPID   string
+	RPName string
 }
 
 func defaultWebAuthnConfig() WebAuthnConfig {
-	return WebAuthnConfig{RPID: "localhost", RPName: "supa-emu", RPOrigin: "http://localhost:3000"}
+	return WebAuthnConfig{RPID: "localhost", RPName: "supa-emu"}
 }
 
 type Factory struct {
@@ -47,9 +46,6 @@ func WithWebAuthn(cfg WebAuthnConfig) FactoryOption {
 		}
 		if cfg.RPName != "" {
 			f.webauthn.RPName = cfg.RPName
-		}
-		if cfg.RPOrigin != "" {
-			f.webauthn.RPOrigin = cfg.RPOrigin
 		}
 	}
 }

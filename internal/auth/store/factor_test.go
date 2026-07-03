@@ -73,7 +73,7 @@ func TestVerifyFactorAndChallenge(t *testing.T) {
 			t.Fatalf("expected ErrChallengeNotFound on reuse, got %v", err)
 		}
 
-		verified, err := s.VerifyFactor(f.ID, "cred")
+		verified, err := s.VerifyFactor(f.ID)
 		if err != nil {
 			t.Fatalf("VerifyFactor: %v", err)
 		}
