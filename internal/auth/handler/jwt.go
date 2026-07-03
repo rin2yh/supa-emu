@@ -22,6 +22,10 @@ type Claims struct {
 	SessionID    string         `json:"session_id,omitempty"`
 	AppMetadata  map[string]any `json:"app_metadata,omitempty"`
 	UserMetadata map[string]any `json:"user_metadata,omitempty"`
+	// AAL / AMR carry the MFA (passkey) assurance level. supabase-js
+	// getAuthenticatorAssuranceLevel reads currentLevel from the access_token.
+	AAL string           `json:"aal,omitempty"`
+	AMR []store.AMREntry `json:"amr,omitempty"`
 }
 
 // jwtv5.Claims インターフェース実装。標準 validator (exp/nbf チェック) を流用するために必要。
@@ -90,7 +94,15 @@ func (t *Tokens) keyFunc(tok *jwtv5.Token) (any, error) {
 // store.IssueSession で CreateSession + IssueRefreshToken を 1 ロックで実行することで、
 // 並行 DeleteUser が走っても session 単独の leak が発生しない。
 func (t *Tokens) Issue(u *store.User) (*TokenResponse, error) {
-	sess, rt, err := t.store.IssueSession(u.ID)
+	return t.IssueWithMethod(u, "password")
+}
+
+// IssueWithMethod issues a session whose amr records the given authentication
+// method ("webauthn" for a passwordless passkey login). The access_token is
+// signed with the same key as a password login, so app-side local JWT
+// verification (getClaims) accepts it regardless of the login method.
+func (t *Tokens) IssueWithMethod(u *store.User, method string) (*TokenResponse, error) {
+	sess, rt, err := t.store.IssueSessionWithMethod(u.ID, method)
 	if err != nil {
 		return nil, err
 	}
@@ -102,6 +114,17 @@ func (t *Tokens) Issue(u *store.User) (*TokenResponse, error) {
 func (t *Tokens) Build(u *store.User, sessionID, refreshToken string) (*TokenResponse, error) {
 	now := t.clock()
 	exp := now.Add(t.ttl)
+	// aal / amr mirror the values held on the session into the JWT. If a passkey
+	// verify has promoted the session to aal2, that assurance level is preserved
+	// across refreshes.
+	aal := "aal1"
+	var amr []store.AMREntry
+	if sess, ok := t.store.GetSession(sessionID); ok {
+		if sess.AAL != "" {
+			aal = sess.AAL
+		}
+		amr = sess.AMR
+	}
 	c := Claims{
 		Subject:      u.ID,
 		Issuer:       t.issuer,
@@ -113,6 +136,8 @@ func (t *Tokens) Build(u *store.User, sessionID, refreshToken string) (*TokenRes
 		SessionID:    sessionID,
 		AppMetadata:  u.AppMetadata,
 		UserMetadata: u.UserMetadata,
+		AAL:          aal,
+		AMR:          amr,
 	}
 	signed, err := jwtv5.NewWithClaims(jwtv5.SigningMethodHS256, c).SignedString([]byte(t.secret))
 	if err != nil {

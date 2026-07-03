@@ -96,6 +96,24 @@ func (s *Store) DeleteUser(id string) error {
 			delete(s.parentToChild, tok)
 		}
 	}
+	// Cascade-delete the user's MFA factors and their challenges too.
+	for fid, f := range s.factors {
+		if f.UserID == id {
+			s.deleteFactorLocked(fid)
+		}
+	}
+	// Cascade-delete the user's passkeys and any registration challenges they own.
+	for pid, pk := range s.passkeys {
+		if pk.UserID == id {
+			delete(s.passkeys, pid)
+			delete(s.passkeyByCred, pk.CredentialID)
+		}
+	}
+	for cid, ch := range s.passkeyChallenges {
+		if ch.UserID == id {
+			delete(s.passkeyChallenges, cid)
+		}
+	}
 	return nil
 }
 

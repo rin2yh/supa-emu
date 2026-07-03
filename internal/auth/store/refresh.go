@@ -9,7 +9,7 @@ import (
 func (s *Store) CreateSession(userID string) (*Session, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.createSessionLocked(userID)
+	return s.createSessionLocked(userID, "password")
 }
 
 func (s *Store) IssueRefreshToken(userID, sessionID string) (*RefreshToken, error) {
@@ -20,10 +20,16 @@ func (s *Store) IssueRefreshToken(userID, sessionID string) (*RefreshToken, erro
 
 // CreateSession + IssueRefreshToken を別ロックで呼ぶと、その隙に DeleteUser が走った場合に
 // session だけ残って refresh_token 発行が失敗するため、handler 経路では 1 ロックで両方発行する。
+// amrMethod is the authentication method recorded in the session's amr
+// ("password" for password login, "webauthn" for passwordless passkey login).
 func (s *Store) IssueSession(userID string) (*Session, *RefreshToken, error) {
+	return s.IssueSessionWithMethod(userID, "password")
+}
+
+func (s *Store) IssueSessionWithMethod(userID, amrMethod string) (*Session, *RefreshToken, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	sess, err := s.createSessionLocked(userID)
+	sess, err := s.createSessionLocked(userID, amrMethod)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -36,17 +42,34 @@ func (s *Store) IssueSession(userID string) (*Session, *RefreshToken, error) {
 	return sess, rt, nil
 }
 
-func (s *Store) createSessionLocked(userID string) (*Session, error) {
+func (s *Store) createSessionLocked(userID, amrMethod string) (*Session, error) {
 	if _, ok := s.users[userID]; !ok {
 		return nil, ErrUserNotFound
 	}
+	now := s.clock()
 	sess := &Session{
 		ID:        uuid.NewString(),
 		UserID:    userID,
-		CreatedAt: s.clock(),
+		CreatedAt: now,
+		// A single-factor login (password or passwordless passkey) starts at
+		// aal1; a later MFA passkey verify promotes the session to aal2.
+		AAL: "aal1",
+		AMR: []AMREntry{{Method: amrMethod, Timestamp: now.Unix()}},
 	}
 	s.sessions[sess.ID] = sess
 	return cloneSession(sess), nil
+}
+
+// GetSession returns a clone of the session. Build uses it to read the aal / amr
+// claims when issuing a JWT.
+func (s *Store) GetSession(sessionID string) (*Session, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	sess, ok := s.sessions[sessionID]
+	if !ok {
+		return nil, false
+	}
+	return cloneSession(sess), true
 }
 
 func (s *Store) issueRefreshTokenLocked(userID, sessionID string) (*RefreshToken, error) {

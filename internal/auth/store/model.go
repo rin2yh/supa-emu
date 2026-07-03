@@ -14,8 +14,11 @@ type User struct {
 	AppMetadata      map[string]any `json:"app_metadata"`
 	UserMetadata     map[string]any `json:"user_metadata"`
 	Identities       []Identity     `json:"identities"`
-	CreatedAt        time.Time      `json:"created_at"`
-	UpdatedAt        time.Time      `json:"updated_at"`
+	// Factors is the list of MFA factors read by supabase-js mfa.listFactors().
+	// GetUser / Snapshot fill in the user's factors ordered by CreatedAt.
+	Factors   []Factor  `json:"factors"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 
 	PasswordHash []byte `json:"-"`
 }
@@ -44,6 +47,69 @@ type Session struct {
 	ID        string    `json:"id"`
 	UserID    string    `json:"user_id"`
 	CreatedAt time.Time `json:"created_at"`
+	// AAL is the session's Authenticator Assurance Level: "aal1" right after a
+	// password login, promoted to "aal2" after an MFA (passkey/webauthn) verify.
+	// It is the source of the JWT aal claim.
+	AAL string `json:"aal"`
+	// AMR is the Authentication Methods References history. It becomes the JWT
+	// amr claim, from which supabase-js getAuthenticatorAssuranceLevel derives
+	// currentAuthenticationMethods.
+	AMR []AMREntry `json:"amr,omitempty"`
+}
+
+// AMREntry represents a single authentication event (method and timestamp).
+type AMREntry struct {
+	Method    string `json:"method"`
+	Timestamp int64  `json:"timestamp"`
+}
+
+// Factor is an MFA factor. This emulator only implements factor_type "webauthn"
+// (passkey). Like GoTrue's user.factors it exposes friendly_name / factor_type /
+// status.
+type Factor struct {
+	ID           string    `json:"id"`
+	UserID       string    `json:"-"`
+	FriendlyName string    `json:"friendly_name,omitempty"`
+	FactorType   string    `json:"factor_type"`
+	Status       string    `json:"status"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+// Challenge is a single-use verification challenge for a factor, invalid once
+// ExpiresAt has passed.
+type Challenge struct {
+	ID        string    `json:"id"`
+	FactorID  string    `json:"factor_id"`
+	Value     string    `json:"value"`
+	CreatedAt time.Time `json:"created_at"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// Passkey is a passwordless (primary-authentication) WebAuthn credential, as
+// used by supabase-js auth.passkey.*. Unlike Factor (a second factor promoting a
+// session to aal2), a passkey authenticates a login from scratch.
+// The emulator has no real public key: authentication is matched by CredentialID
+// rather than by verifying a signature, so only the credential id is persisted.
+type Passkey struct {
+	ID           string    `json:"id"`
+	UserID       string    `json:"user_id"`
+	FriendlyName string    `json:"friendly_name,omitempty"`
+	CredentialID string    `json:"credential_id"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+// PasskeyChallenge is a single-use passkey ceremony challenge. Registration
+// challenges carry the authenticated UserID; authentication challenges are
+// discoverable (no user yet), so UserID is empty.
+type PasskeyChallenge struct {
+	ID           string    `json:"id"`
+	UserID       string    `json:"user_id,omitempty"`
+	Purpose      string    `json:"purpose"`
+	FriendlyName string    `json:"friendly_name,omitempty"`
+	Value        string    `json:"value"`
+	CreatedAt    time.Time `json:"created_at"`
+	ExpiresAt    time.Time `json:"expires_at"`
 }
 
 // /__emulator/snapshot で JSON 化される前提のため snake_case + 空 slice を担保する。
@@ -51,4 +117,7 @@ type Snapshot struct {
 	Users         []User         `json:"users"`
 	Sessions      []Session      `json:"sessions"`
 	RefreshTokens []RefreshToken `json:"refresh_tokens"`
+	Factors       []Factor       `json:"factors"`
+	Challenges    []Challenge    `json:"challenges"`
+	Passkeys      []Passkey      `json:"passkeys"`
 }
