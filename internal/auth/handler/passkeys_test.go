@@ -8,7 +8,6 @@ import (
 
 	"github.com/rin2yh/supa-emu/internal/auth/handler"
 	"github.com/rin2yh/supa-emu/internal/auth/handler/handlertest"
-	"github.com/rin2yh/supa-emu/internal/auth/store"
 )
 
 // optionsChallengeID serves a passkey options endpoint and returns its challenge_id.
@@ -87,21 +86,21 @@ func TestPasswordlessPasskeyFlow(t *testing.T) {
 			t.Fatalf("authentication verify status: %d body=%s", vRec.Code, vRec.Body.String())
 		}
 
-		var resp struct {
-			Session handler.TokenResponse `json:"session"`
-			User    store.User            `json:"user"`
-		}
+		// The token response is returned at the top level (GoTrue shape), not
+		// nested under "session" — supabase-js's _sessionResponse detects the
+		// session via a top-level access_token, so nesting would resolve it to null.
+		var resp handler.TokenResponse
 		handlertest.DecodeJSON(t, vRec, &resp)
-		if resp.Session.AccessToken == "" || resp.Session.RefreshToken == "" {
-			t.Fatalf("no session tokens: %+v", resp.Session)
+		if resp.AccessToken == "" || resp.RefreshToken == "" {
+			t.Fatalf("no session tokens: %+v", resp)
 		}
-		if resp.User.Email != "alice@example.com" {
-			t.Errorf("authenticated as wrong user: %s", resp.User.Email)
+		if resp.User == nil || resp.User.Email != "alice@example.com" {
+			t.Errorf("authenticated as wrong user: %+v", resp.User)
 		}
 
 		// The access_token must verify under the same key/issuer as a password
 		// login, and carry aal1 + amr=[webauthn] (primary auth, not an aal2 upgrade).
-		claims, err := tk.Verify(resp.Session.AccessToken)
+		claims, err := tk.Verify(resp.AccessToken)
 		if err != nil {
 			t.Fatalf("verify passkey access_token: %v", err)
 		}
@@ -142,9 +141,7 @@ func TestPasskeySessionSharesPasswordSigning(t *testing.T) {
 		if vRec.Code != http.StatusOK {
 			t.Fatalf("authentication verify status: %d body=%s", vRec.Code, vRec.Body.String())
 		}
-		var resp struct {
-			Session handler.TokenResponse `json:"session"`
-		}
+		var resp handler.TokenResponse
 		handlertest.DecodeJSON(t, vRec, &resp)
 
 		// Both tokens must verify under the same tokens instance. tk.Verify enforces
@@ -155,7 +152,7 @@ func TestPasskeySessionSharesPasswordSigning(t *testing.T) {
 		if err != nil {
 			t.Fatalf("verify password-login token: %v", err)
 		}
-		pkClaims, err := tk.Verify(resp.Session.AccessToken)
+		pkClaims, err := tk.Verify(resp.AccessToken)
 		if err != nil {
 			t.Fatalf("verify passkey token: %v", err)
 		}

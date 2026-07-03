@@ -146,7 +146,11 @@ type passkeyAuthenticationVerifyRequest struct {
 
 // PasskeyAuthenticationVerify resolves the presented credential to its owner and
 // issues a brand new session (POST /auth/v1/passkeys/authentication/verify).
-// No Bearer token required; on success it returns {session, user}.
+// No Bearer token required; on success it returns the GoTrue token response at the
+// top level (access_token, refresh_token, user, ...), matching the password-login
+// token endpoint. supabase-js's _sessionResponse xform detects the session via a
+// top-level access_token, so the token response must not be nested under a "session"
+// key or the client resolves session to null.
 func PasskeyAuthenticationVerify(c *Context) {
 	var req passkeyAuthenticationVerifyRequest
 	if err := c.ReadJSON(&req); err != nil {
@@ -187,10 +191,7 @@ func PasskeyAuthenticationVerify(c *Context) {
 		c.Error(http.StatusInternalServerError, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, map[string]any{
-		"session": tr,
-		"user":    u,
-	})
+	c.JSON(http.StatusOK, tr)
 }
 
 // writePasskeyChallengeError maps a ConsumePasskeyChallenge error to its response.
