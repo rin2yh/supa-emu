@@ -12,7 +12,7 @@ func TestPasskeyRegistrationAndLookup(t *testing.T) {
 		hash, _ := HashPassword("password123")
 		u, _ := s.CreateUser("alice@example.com", hash)
 
-		pk, err := s.AddPasskey(u.ID, "My Laptop", "cred-abc", "cred-abc")
+		pk, err := s.AddPasskey(u.ID, "My Laptop", "cred-abc")
 		if err != nil {
 			t.Fatalf("AddPasskey: %v", err)
 		}
@@ -31,10 +31,10 @@ func TestPasskeyRegistrationAndLookup(t *testing.T) {
 		hash, _ := HashPassword("password123")
 		u, _ := s.CreateUser("alice@example.com", hash)
 
-		if _, err := s.AddPasskey(u.ID, "A", "cred-dup", "cred-dup"); err != nil {
+		if _, err := s.AddPasskey(u.ID, "A", "cred-dup"); err != nil {
 			t.Fatalf("first AddPasskey: %v", err)
 		}
-		if _, err := s.AddPasskey(u.ID, "B", "cred-dup", "cred-dup"); !errors.Is(err, ErrPasskeyExists) {
+		if _, err := s.AddPasskey(u.ID, "B", "cred-dup"); !errors.Is(err, ErrPasskeyExists) {
 			t.Fatalf("expected ErrPasskeyExists, got %v", err)
 		}
 	})
@@ -104,7 +104,7 @@ func TestDeleteUserCascadesPasskeys(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		u, _ := s.CreateUser("alice@example.com", hash)
-		_, _ = s.AddPasskey(u.ID, "Key", "cred-1", "cred-1")
+		_, _ = s.AddPasskey(u.ID, "Key", "cred-1")
 		_, _ = s.CreatePasskeyChallenge(u.ID, PasskeyPurposeRegistration, "Key")
 
 		if err := s.DeleteUser(u.ID); err != nil {

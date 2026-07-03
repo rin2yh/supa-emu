@@ -89,15 +89,14 @@ type Challenge struct {
 // Passkey is a passwordless (primary-authentication) WebAuthn credential, as
 // used by supabase-js auth.passkey.*. Unlike Factor (a second factor promoting a
 // session to aal2), a passkey authenticates a login from scratch.
+// The emulator has no real public key: authentication is matched by CredentialID
+// rather than by verifying a signature, so only the credential id is persisted.
 type Passkey struct {
-	ID           string `json:"id"`
-	UserID       string `json:"user_id"`
-	FriendlyName string `json:"friendly_name,omitempty"`
-	CredentialID string `json:"credential_id"`
-	// PublicKey is opaque in the emulator: authentication is matched by
-	// CredentialID rather than by verifying a real signature.
-	PublicKey string    `json:"-"`
-	CreatedAt time.Time `json:"created_at"`
+	ID           string    `json:"id"`
+	UserID       string    `json:"user_id"`
+	FriendlyName string    `json:"friendly_name,omitempty"`
+	CredentialID string    `json:"credential_id"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 // PasskeyChallenge is a single-use passkey ceremony challenge. Registration

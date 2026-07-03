@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/base64"
 	"errors"
 	"net/http"
 	"strings"
@@ -22,15 +21,7 @@ import (
 // webauthnCredential is the subset of the browser's serialized WebAuthn
 // credential the emulator needs: its credential id.
 type webauthnCredential struct {
-	ID    string `json:"id"`
-	RawID string `json:"rawId"`
-}
-
-func (w webauthnCredential) credentialID() string {
-	if w.ID != "" {
-		return w.ID
-	}
-	return w.RawID
+	ID string `json:"id"`
 }
 
 type passkeyRegistrationOptionsRequest struct {
@@ -86,7 +77,7 @@ func PasskeyRegistrationVerify(c *Context) {
 		c.ErrorCode(http.StatusUnprocessableEntity, "validation_failed", "challenge_id is required")
 		return
 	}
-	credID := req.Credential.credentialID()
+	credID := req.Credential.ID
 	if credID == "" {
 		c.ErrorCode(http.StatusUnprocessableEntity, "validation_failed", "credential is required")
 		return
@@ -107,9 +98,7 @@ func PasskeyRegistrationVerify(c *Context) {
 	if friendly == "" {
 		friendly = ch.FriendlyName
 	}
-	// The emulator has no real public key; store the credential id as the opaque
-	// key material — authentication matches on credential id, not a signature.
-	pk, err := c.store.AddPasskey(u.ID, friendly, credID, credID)
+	pk, err := c.store.AddPasskey(u.ID, friendly, credID)
 	if err != nil {
 		switch {
 		case errors.Is(err, store.ErrPasskeyExists):
@@ -168,7 +157,7 @@ func PasskeyAuthenticationVerify(c *Context) {
 		c.ErrorCode(http.StatusUnprocessableEntity, "validation_failed", "challenge_id is required")
 		return
 	}
-	credID := req.Credential.credentialID()
+	credID := req.Credential.ID
 	if credID == "" {
 		c.ErrorCode(http.StatusUnprocessableEntity, "validation_failed", "credential is required")
 		return
@@ -223,22 +212,12 @@ func (c *Context) passkeyCreationOptions(u *store.User, challenge string, exclud
 		excludeCreds = append(excludeCreds, map[string]any{"id": pk.CredentialID, "type": "public-key"})
 	}
 	return map[string]any{
-		"challenge": challenge,
-		"rp": map[string]any{
-			"id":   c.webauthn.RPID,
-			"name": c.webauthn.RPName,
-		},
-		"user": map[string]any{
-			"id":          base64.RawURLEncoding.EncodeToString([]byte(u.ID)),
-			"name":        u.Email,
-			"displayName": u.Email,
-		},
-		"pubKeyCredParams": []map[string]any{
-			{"type": "public-key", "alg": -7},
-			{"type": "public-key", "alg": -257},
-		},
-		"timeout":     60000,
-		"attestation": "none",
+		"challenge":        challenge,
+		"rp":               c.webauthnRP(),
+		"user":             webauthnUser(u),
+		"pubKeyCredParams": webauthnPubKeyCredParams(),
+		"timeout":          60000,
+		"attestation":      "none",
 		"authenticatorSelection": map[string]any{
 			"residentKey":        "required",
 			"requireResidentKey": true,

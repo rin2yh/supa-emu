@@ -240,22 +240,12 @@ func UnenrollFactor(c *Context) {
 func (c *Context) credentialCreationOptions(u *store.User, challenge string) map[string]any {
 	return map[string]any{
 		"publicKey": map[string]any{
-			"challenge": challenge,
-			"rp": map[string]any{
-				"id":   c.webauthn.RPID,
-				"name": c.webauthn.RPName,
-			},
-			"user": map[string]any{
-				"id":          base64.RawURLEncoding.EncodeToString([]byte(u.ID)),
-				"name":        u.Email,
-				"displayName": u.Email,
-			},
-			"pubKeyCredParams": []map[string]any{
-				{"type": "public-key", "alg": -7},
-				{"type": "public-key", "alg": -257},
-			},
-			"timeout":     60000,
-			"attestation": "none",
+			"challenge":        challenge,
+			"rp":               c.webauthnRP(),
+			"user":             webauthnUser(u),
+			"pubKeyCredParams": webauthnPubKeyCredParams(),
+			"timeout":          60000,
+			"attestation":      "none",
 			"authenticatorSelection": map[string]any{
 				"residentKey":      "required",
 				"userVerification": "preferred",

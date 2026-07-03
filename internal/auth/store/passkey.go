@@ -67,7 +67,7 @@ func (s *Store) ConsumePasskeyChallenge(challengeID, purpose string) (*PasskeyCh
 
 // AddPasskey persists a registered credential for a user. A credentialID that is
 // already registered yields ErrPasskeyExists.
-func (s *Store) AddPasskey(userID, friendlyName, credentialID, publicKey string) (*Passkey, error) {
+func (s *Store) AddPasskey(userID, friendlyName, credentialID string) (*Passkey, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, ok := s.users[userID]; !ok {
@@ -81,7 +81,6 @@ func (s *Store) AddPasskey(userID, friendlyName, credentialID, publicKey string)
 		UserID:       userID,
 		FriendlyName: friendlyName,
 		CredentialID: credentialID,
-		PublicKey:    publicKey,
 		CreatedAt:    s.clock(),
 	}
 	s.passkeys[pk.ID] = pk
@@ -113,7 +112,8 @@ func (s *Store) ListUserPasskeys(userID string) []Passkey {
 	out := make([]Passkey, 0)
 	for _, pk := range s.passkeys {
 		if pk.UserID == userID {
-			out = append(out, *clonePasskey(pk))
+			// Passkey has no reference fields, so a value copy fully detaches it.
+			out = append(out, *pk)
 		}
 	}
 	sort.Slice(out, func(i, j int) bool {
