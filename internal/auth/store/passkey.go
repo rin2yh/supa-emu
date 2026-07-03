@@ -88,6 +88,34 @@ func (s *Store) AddPasskey(userID, friendlyName, credentialID string) (*Passkey,
 	return clonePasskey(pk), nil
 }
 
+// DeletePasskey removes a user's own passkey by its passkey ID. A passkey that
+// does not exist, or is owned by a different user, yields ErrPasskeyNotFound so
+// a caller cannot distinguish "not found" from "not yours".
+func (s *Store) DeletePasskey(userID, passkeyID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	pk, ok := s.passkeys[passkeyID]
+	if !ok || pk.UserID != userID {
+		return ErrPasskeyNotFound
+	}
+	delete(s.passkeys, passkeyID)
+	delete(s.passkeyByCred, pk.CredentialID)
+	return nil
+}
+
+// MarkPasskeyUsed stamps a passkey's LastUsedAt with the current time after a
+// successful authentication. A missing passkey is a no-op.
+func (s *Store) MarkPasskeyUsed(passkeyID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	pk, ok := s.passkeys[passkeyID]
+	if !ok {
+		return
+	}
+	now := s.clock()
+	pk.LastUsedAt = &now
+}
+
 // FindPasskeyByCredentialID resolves the credential presented during an
 // authentication ceremony back to its stored passkey (and thus its owner).
 func (s *Store) FindPasskeyByCredentialID(credentialID string) (*Passkey, bool) {

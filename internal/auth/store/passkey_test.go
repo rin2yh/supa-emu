@@ -47,6 +47,100 @@ func TestPasskeyRegistrationAndLookup(t *testing.T) {
 	})
 }
 
+func TestListUserPasskeys(t *testing.T) {
+	t.Run("returns only the given user's passkeys ordered by CreatedAt", func(t *testing.T) {
+		now := time.Date(2026, 7, 3, 0, 0, 0, 0, time.UTC)
+		s := New(Config{Clock: func() time.Time { return now }, ReuseInterval: 10 * time.Second})
+		hash, _ := HashPassword("password123")
+		alice, _ := s.CreateUser("alice@example.com", hash)
+		bob, _ := s.CreateUser("bob@example.com", hash)
+
+		_, _ = s.AddPasskey(alice.ID, "Laptop", "cred-a1")
+		now = now.Add(time.Minute)
+		_, _ = s.AddPasskey(alice.ID, "Phone", "cred-a2")
+		_, _ = s.AddPasskey(bob.ID, "Bob Key", "cred-b1")
+
+		list := s.ListUserPasskeys(alice.ID)
+		if len(list) != 2 {
+			t.Fatalf("expected 2 passkeys for alice, got %d: %+v", len(list), list)
+		}
+		if list[0].CredentialID != "cred-a1" || list[1].CredentialID != "cred-a2" {
+			t.Errorf("wrong order: %+v", list)
+		}
+		if list[0].LastUsedAt != nil {
+			t.Errorf("LastUsedAt should be nil before use: %+v", list[0].LastUsedAt)
+		}
+	})
+}
+
+func TestDeletePasskey(t *testing.T) {
+	t.Run("deletes the owner's passkey and clears the credential index", func(t *testing.T) {
+		s := newStore()
+		hash, _ := HashPassword("password123")
+		u, _ := s.CreateUser("alice@example.com", hash)
+		pk, _ := s.AddPasskey(u.ID, "Key", "cred-del")
+
+		if err := s.DeletePasskey(u.ID, pk.ID); err != nil {
+			t.Fatalf("DeletePasskey: %v", err)
+		}
+		if _, ok := s.FindPasskeyByCredentialID("cred-del"); ok {
+			t.Error("credential still resolvable after delete")
+		}
+		if got := s.ListUserPasskeys(u.ID); len(got) != 0 {
+			t.Errorf("passkey not removed from list: %+v", got)
+		}
+	})
+
+	t.Run("a missing passkey returns ErrPasskeyNotFound", func(t *testing.T) {
+		s := newStore()
+		hash, _ := HashPassword("password123")
+		u, _ := s.CreateUser("alice@example.com", hash)
+		if err := s.DeletePasskey(u.ID, "nope"); !errors.Is(err, ErrPasskeyNotFound) {
+			t.Fatalf("expected ErrPasskeyNotFound, got %v", err)
+		}
+	})
+
+	t.Run("another user's passkey is not deletable and returns ErrPasskeyNotFound", func(t *testing.T) {
+		s := newStore()
+		hash, _ := HashPassword("password123")
+		alice, _ := s.CreateUser("alice@example.com", hash)
+		bob, _ := s.CreateUser("bob@example.com", hash)
+		pk, _ := s.AddPasskey(bob.ID, "Bob Key", "cred-bob")
+
+		if err := s.DeletePasskey(alice.ID, pk.ID); !errors.Is(err, ErrPasskeyNotFound) {
+			t.Fatalf("expected ErrPasskeyNotFound, got %v", err)
+		}
+		if _, ok := s.FindPasskeyByCredentialID("cred-bob"); !ok {
+			t.Error("bob's passkey should survive alice's delete attempt")
+		}
+	})
+}
+
+func TestMarkPasskeyUsed(t *testing.T) {
+	t.Run("stamps LastUsedAt with the current clock", func(t *testing.T) {
+		now := time.Date(2026, 7, 3, 1, 0, 0, 0, time.UTC)
+		s := New(Config{Clock: func() time.Time { return now }, ReuseInterval: 10 * time.Second})
+		hash, _ := HashPassword("password123")
+		u, _ := s.CreateUser("alice@example.com", hash)
+		pk, _ := s.AddPasskey(u.ID, "Key", "cred-used")
+
+		s.MarkPasskeyUsed(pk.ID)
+
+		list := s.ListUserPasskeys(u.ID)
+		if len(list) != 1 || list[0].LastUsedAt == nil {
+			t.Fatalf("LastUsedAt not set: %+v", list)
+		}
+		if !list[0].LastUsedAt.Equal(now) {
+			t.Errorf("LastUsedAt: got=%v want=%v", *list[0].LastUsedAt, now)
+		}
+	})
+
+	t.Run("a missing passkey is a no-op", func(t *testing.T) {
+		s := newStore()
+		s.MarkPasskeyUsed("nope") // must not panic
+	})
+}
+
 func TestPasskeyChallenge(t *testing.T) {
 	t.Run("registration challenge carries the user and is single-use", func(t *testing.T) {
 		s := newStore()

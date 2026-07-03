@@ -65,6 +65,161 @@ func registerPasskey(t *testing.T, f *handler.Factory, bearer, credID, friendlyN
 	return reg.ID
 }
 
+func TestPasskeyList(t *testing.T) {
+	t.Run("returns the caller's passkeys as a top-level JSON array", func(t *testing.T) {
+		st := handlertest.NewStore(nil)
+		tk := handlertest.NewTokens(st, nil)
+		f := handler.NewFactory(st, tk)
+		seeded := handlertest.Seed(t, st, tk, "alice@example.com", "password123")
+		id := registerPasskey(t, f, seeded.AccessToken, "cred-list-1", "My device")
+
+		req := handlertest.NewRequest(t, http.MethodGet, "/auth/v1/passkeys", nil)
+		req.Header.Set("Authorization", "Bearer "+seeded.AccessToken)
+		rec := httptest.NewRecorder()
+		handlertest.Serve(f, handler.PasskeyList, rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status: %d body=%s", rec.Code, rec.Body.String())
+		}
+
+		// The body must be a top-level array (not wrapped under a key), since
+		// supabase-js auth.passkey.list() hands the raw array back as PasskeyListItem[].
+		var list []map[string]any
+		handlertest.DecodeJSON(t, rec, &list)
+		if len(list) != 1 {
+			t.Fatalf("expected 1 passkey, got %d: %+v", len(list), list)
+		}
+		item := list[0]
+		if item["id"] != id {
+			t.Errorf("id: got=%v want=%q", item["id"], id)
+		}
+		if item["friendly_name"] != "My device" {
+			t.Errorf("friendly_name: got=%v", item["friendly_name"])
+		}
+		if _, present := item["created_at"]; !present {
+			t.Error("created_at missing")
+		}
+		// Never authenticated, so last_used_at must be present and null.
+		if v, present := item["last_used_at"]; !present || v != nil {
+			t.Errorf("last_used_at: present=%v value=%v (want present, null)", present, v)
+		}
+	})
+
+	t.Run("without a Bearer returns 401 no_authorization", func(t *testing.T) {
+		st := handlertest.NewStore(nil)
+		f := handler.NewFactory(st, handlertest.NewTokens(st, nil))
+
+		rec := httptest.NewRecorder()
+		handlertest.Serve(f, handler.PasskeyList, rec,
+			handlertest.NewRequest(t, http.MethodGet, "/auth/v1/passkeys", nil))
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("status: %d", rec.Code)
+		}
+		if !strings.Contains(rec.Body.String(), "no_authorization") {
+			t.Errorf("body: %s", rec.Body.String())
+		}
+	})
+
+	t.Run("last_used_at is populated after a successful authentication", func(t *testing.T) {
+		st := handlertest.NewStore(nil)
+		tk := handlertest.NewTokens(st, nil)
+		f := handler.NewFactory(st, tk)
+		seeded := handlertest.Seed(t, st, tk, "alice@example.com", "password123")
+		registerPasskey(t, f, seeded.AccessToken, "cred-used-1", "My device")
+
+		challengeID := optionsChallengeID(t, f, handler.PasskeyAuthenticationOptions, "", nil)
+		vReq := handlertest.NewRequest(t, http.MethodPost, "/auth/v1/passkeys/authentication/verify", map[string]any{
+			"challenge_id": challengeID,
+			"credential":   map[string]any{"id": "cred-used-1"},
+		})
+		vRec := httptest.NewRecorder()
+		handlertest.Serve(f, handler.PasskeyAuthenticationVerify, vRec, vReq)
+		if vRec.Code != http.StatusOK {
+			t.Fatalf("authentication verify status: %d body=%s", vRec.Code, vRec.Body.String())
+		}
+
+		req := handlertest.NewRequest(t, http.MethodGet, "/auth/v1/passkeys", nil)
+		req.Header.Set("Authorization", "Bearer "+seeded.AccessToken)
+		rec := httptest.NewRecorder()
+		handlertest.Serve(f, handler.PasskeyList, rec, req)
+		var list []map[string]any
+		handlertest.DecodeJSON(t, rec, &list)
+		if len(list) != 1 || list[0]["last_used_at"] == nil {
+			t.Fatalf("last_used_at should be set after auth: %+v", list)
+		}
+	})
+}
+
+func TestPasskeyDelete(t *testing.T) {
+	t.Run("deletes the caller's own passkey and removes it from the list", func(t *testing.T) {
+		st := handlertest.NewStore(nil)
+		tk := handlertest.NewTokens(st, nil)
+		f := handler.NewFactory(st, tk)
+		seeded := handlertest.Seed(t, st, tk, "alice@example.com", "password123")
+		id := registerPasskey(t, f, seeded.AccessToken, "cred-del-1", "My device")
+
+		req := handlertest.NewRequest(t, http.MethodDelete, "/auth/v1/passkeys/"+id, nil, "id", id)
+		req.Header.Set("Authorization", "Bearer "+seeded.AccessToken)
+		rec := httptest.NewRecorder()
+		handlertest.Serve(f, handler.PasskeyDelete, rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status: %d body=%s", rec.Code, rec.Body.String())
+		}
+		var resp struct {
+			ID string `json:"id"`
+		}
+		handlertest.DecodeJSON(t, rec, &resp)
+		if resp.ID != id {
+			t.Errorf("id: got=%q want=%q", resp.ID, id)
+		}
+
+		// Now the list is empty.
+		lReq := handlertest.NewRequest(t, http.MethodGet, "/auth/v1/passkeys", nil)
+		lReq.Header.Set("Authorization", "Bearer "+seeded.AccessToken)
+		lRec := httptest.NewRecorder()
+		handlertest.Serve(f, handler.PasskeyList, lRec, lReq)
+		var list []map[string]any
+		handlertest.DecodeJSON(t, lRec, &list)
+		if len(list) != 0 {
+			t.Errorf("passkey not deleted: %+v", list)
+		}
+	})
+
+	t.Run("another user's passkey returns 404 passkey_not_found", func(t *testing.T) {
+		st := handlertest.NewStore(nil)
+		tk := handlertest.NewTokens(st, nil)
+		f := handler.NewFactory(st, tk)
+		alice := handlertest.Seed(t, st, tk, "alice@example.com", "password123")
+		bob := handlertest.Seed(t, st, tk, "bob@example.com", "password123")
+		bobKey := registerPasskey(t, f, bob.AccessToken, "cred-bob-1", "Bob device")
+
+		req := handlertest.NewRequest(t, http.MethodDelete, "/auth/v1/passkeys/"+bobKey, nil, "id", bobKey)
+		req.Header.Set("Authorization", "Bearer "+alice.AccessToken)
+		rec := httptest.NewRecorder()
+		handlertest.Serve(f, handler.PasskeyDelete, rec, req)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("status: %d body=%s", rec.Code, rec.Body.String())
+		}
+		if !strings.Contains(rec.Body.String(), "passkey_not_found") {
+			t.Errorf("body: %s", rec.Body.String())
+		}
+	})
+
+	t.Run("without a Bearer returns 401 no_authorization", func(t *testing.T) {
+		st := handlertest.NewStore(nil)
+		f := handler.NewFactory(st, handlertest.NewTokens(st, nil))
+
+		rec := httptest.NewRecorder()
+		handlertest.Serve(f, handler.PasskeyDelete, rec,
+			handlertest.NewRequest(t, http.MethodDelete, "/auth/v1/passkeys/some-id", nil, "id", "some-id"))
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("status: %d", rec.Code)
+		}
+		if !strings.Contains(rec.Body.String(), "no_authorization") {
+			t.Errorf("body: %s", rec.Body.String())
+		}
+	})
+}
+
 func TestPasswordlessPasskeyFlow(t *testing.T) {
 	t.Run("register then authenticate issues a new aal1 session for the passkey owner", func(t *testing.T) {
 		st := handlertest.NewStore(nil)

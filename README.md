@@ -69,8 +69,12 @@ A passkey is the login itself: `authentication/verify` issues a **new session** 
 | `POST` | `/auth/v1/passkeys/registration/verify` | body `{ challenge_id, credential }` (Bearer) | `{ id, friendly_name?, created_at }` |
 | `POST` | `/auth/v1/passkeys/authentication/options` | `passkey.signIn` (no auth) | `{ challenge_id, options, expires_at }` |
 | `POST` | `/auth/v1/passkeys/authentication/verify` | body `{ challenge_id, credential }` (no auth) | `{ access_token, refresh_token, user, ... }` (GoTrue token response) |
+| `GET` | `/auth/v1/passkeys` | `passkey.list` (Bearer) | `[ { id, friendly_name?, created_at, last_used_at } ]` (top-level array) |
+| `DELETE` | `/auth/v1/passkeys/{id}` | `passkey.unenroll` (Bearer) | `{ id }` |
 
 Challenges are single-use with a 5&nbsp;min TTL. Registration options require a Bearer token; authentication options are discoverable (no auth). The RP id defaults to `127.0.0.1` to match a local E2E origin (`http://127.0.0.1:PORT`).
+
+`GET /auth/v1/passkeys` and `DELETE /auth/v1/passkeys/{id}` are user-scoped management endpoints (Bearer, the caller's own passkeys — no service_role). The list body is a **top-level JSON array** because supabase-js `auth.passkey.list()` uses `xform: (data) => ({ data })` and hands the array straight back as `PasskeyListItem[]`. `last_used_at` is `null` until the passkey's first successful authentication. The `{id}` is the passkey record ID (from `registration/verify`), not the credential id; deleting a passkey that does not exist or belongs to another user returns `404 passkey_not_found`.
 
 ## WebAuthn MFA factors (`auth.mfa.*`)
 
