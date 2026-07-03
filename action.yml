@@ -30,6 +30,18 @@ inputs:
     description: 'Refresh token reuse window (-refresh-reuse-interval), e.g. 10s. Uses the emulator default when empty.'
     required: false
     default: ''
+  webauthn-rp-id:
+    description: 'Passkey Relying Party ID (-webauthn-rp-id). Uses the emulator default when empty.'
+    required: false
+    default: ''
+  webauthn-rp-name:
+    description: 'Passkey Relying Party name (-webauthn-rp-name). Uses the emulator default when empty.'
+    required: false
+    default: ''
+  webauthn-rp-origin:
+    description: 'Passkey Relying Party origin (-webauthn-rp-origin). Uses the emulator default when empty.'
+    required: false
+    default: ''
   wait-for-health:
     description: 'Wait until /auth/v1/health responds before finishing.'
     required: false
@@ -90,6 +102,9 @@ runs:
         JWT_ISSUER: ${{ inputs.jwt-issuer }}
         ACCESS_TOKEN_TTL: ${{ inputs.access-token-ttl }}
         REFRESH_REUSE_INTERVAL: ${{ inputs.refresh-reuse-interval }}
+        WEBAUTHN_RP_ID: ${{ inputs.webauthn-rp-id }}
+        WEBAUTHN_RP_NAME: ${{ inputs.webauthn-rp-name }}
+        WEBAUTHN_RP_ORIGIN: ${{ inputs.webauthn-rp-origin }}
       run: |
         set -euo pipefail
         args=( -addr "$ADDR" )
@@ -97,6 +112,9 @@ runs:
         if [ -n "$JWT_ISSUER" ]; then args+=( -jwt-issuer "$JWT_ISSUER" ); fi
         if [ -n "$ACCESS_TOKEN_TTL" ]; then args+=( -access-token-ttl "$ACCESS_TOKEN_TTL" ); fi
         if [ -n "$REFRESH_REUSE_INTERVAL" ]; then args+=( -refresh-reuse-interval "$REFRESH_REUSE_INTERVAL" ); fi
+        if [ -n "$WEBAUTHN_RP_ID" ]; then args+=( -webauthn-rp-id "$WEBAUTHN_RP_ID" ); fi
+        if [ -n "$WEBAUTHN_RP_NAME" ]; then args+=( -webauthn-rp-name "$WEBAUTHN_RP_NAME" ); fi
+        if [ -n "$WEBAUTHN_RP_ORIGIN" ]; then args+=( -webauthn-rp-origin "$WEBAUTHN_RP_ORIGIN" ); fi
         log="$RUNNER_TEMP/supa-emu/emulator.log"
         nohup supa-emu "${args[@]}" > "$log" 2>&1 &
         pid=$!

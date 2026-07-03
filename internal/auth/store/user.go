@@ -96,6 +96,17 @@ func (s *Store) DeleteUser(id string) error {
 			delete(s.parentToChild, tok)
 		}
 	}
+	// MFA 要素とそれに紐づく challenge も cascade 削除する。
+	for fid, f := range s.factors {
+		if f.UserID == id {
+			delete(s.factors, fid)
+			for cid, ch := range s.challenges {
+				if ch.FactorID == fid {
+					delete(s.challenges, cid)
+				}
+			}
+		}
+	}
 	return nil
 }
 

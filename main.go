@@ -31,7 +31,11 @@ func run(args []string) error {
 	clock := time.Now
 	st := store.New(store.Config{Clock: clock, ReuseInterval: cfg.Auth.ReuseInterval})
 	tk := handler.NewTokens(st, cfg.Auth.JWTSecret, cfg.Auth.JWTIssuer, cfg.Auth.AccessTokenTTL, clock)
-	f := handler.NewFactory(st, tk)
+	f := handler.NewFactory(st, tk, handler.WithWebAuthn(handler.WebAuthnConfig{
+		RPID:     cfg.Auth.WebAuthn.RPID,
+		RPName:   cfg.Auth.WebAuthn.RPName,
+		RPOrigin: cfg.Auth.WebAuthn.RPOrigin,
+	}))
 
 	mux := http.NewServeMux()
 	mux.Handle("GET /auth/v1/health", f.Handle(handler.Health))
@@ -40,6 +44,11 @@ func run(args []string) error {
 	mux.Handle("POST /auth/v1/token", f.Handle(handler.Token))
 	mux.Handle("GET /auth/v1/user", f.Handle(handler.GetUser))
 	mux.Handle("POST /auth/v1/logout", f.Handle(handler.Logout))
+	// passkey (WebAuthn) MFA: enroll → challenge → verify → unenroll
+	mux.Handle("POST /auth/v1/factors", f.Handle(handler.EnrollFactor))
+	mux.Handle("POST /auth/v1/factors/{factorId}/challenge", f.Handle(handler.ChallengeFactor))
+	mux.Handle("POST /auth/v1/factors/{factorId}/verify", f.Handle(handler.VerifyFactor))
+	mux.Handle("DELETE /auth/v1/factors/{factorId}", f.Handle(handler.UnenrollFactor))
 	mux.Handle("GET /auth/v1/admin/users", f.Handle(handler.AdminListUsers))
 	mux.Handle("DELETE /auth/v1/admin/users/{id}", f.Handle(handler.AdminDeleteUser))
 	mux.Handle("POST /__emulator/reset", f.Handle(handler.Reset))

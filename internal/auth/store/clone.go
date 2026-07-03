@@ -1,5 +1,7 @@
 package store
 
+import "sort"
+
 // cloneUser は呼び出し側の map/スライス書き換えがストア本体に漏れないよう deep copy する。
 // 旧シャローコピー実装では `clone.AppMetadata["k"]=v` が RWMutex 外からストアの map を
 // 直接書き換え、Snapshot 中の goroutine と並走して concurrent map fatal を起こすリスクがあった。
@@ -18,11 +20,40 @@ func (s *Store) cloneUser(u *User) *User {
 	if u.PasswordHash != nil {
 		c.PasswordHash = append([]byte(nil), u.PasswordHash...)
 	}
+	// Factor は factors map が唯一の真実。ここで CreatedAt 昇順に導出して埋める。
+	c.Factors = s.userFactorsLocked(u.ID)
 	return &c
+}
+
+// userFactorsLocked は user に紐づく Factor を CreatedAt 昇順（同時刻は ID 昇順）で clone する。
+// read/write いずれかのロック保持を前提とする。要素が無くても非 nil の空 slice を返し、
+// supabase-js の user.factors が null にならないようにする。
+func (s *Store) userFactorsLocked(userID string) []Factor {
+	out := make([]Factor, 0)
+	for _, f := range s.factors {
+		if f.UserID == userID {
+			out = append(out, *cloneFactor(f))
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].CreatedAt.Equal(out[j].CreatedAt) {
+			return out[i].ID < out[j].ID
+		}
+		return out[i].CreatedAt.Before(out[j].CreatedAt)
+	})
+	return out
 }
 
 func cloneSession(sess *Session) *Session {
 	c := *sess
+	if sess.AMR != nil {
+		c.AMR = append([]AMREntry(nil), sess.AMR...)
+	}
+	return &c
+}
+
+func cloneFactor(f *Factor) *Factor {
+	c := *f
 	return &c
 }
 

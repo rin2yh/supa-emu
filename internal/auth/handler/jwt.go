@@ -22,6 +22,10 @@ type Claims struct {
 	SessionID    string         `json:"session_id,omitempty"`
 	AppMetadata  map[string]any `json:"app_metadata,omitempty"`
 	UserMetadata map[string]any `json:"user_metadata,omitempty"`
+	// AAL / AMR は MFA (passkey) の保証レベルを表す。supabase-js の
+	// getAuthenticatorAssuranceLevel が access_token から currentLevel を読む。
+	AAL string           `json:"aal,omitempty"`
+	AMR []store.AMREntry `json:"amr,omitempty"`
 }
 
 // jwtv5.Claims インターフェース実装。標準 validator (exp/nbf チェック) を流用するために必要。
@@ -102,6 +106,16 @@ func (t *Tokens) Issue(u *store.User) (*TokenResponse, error) {
 func (t *Tokens) Build(u *store.User, sessionID, refreshToken string) (*TokenResponse, error) {
 	now := t.clock()
 	exp := now.Add(t.ttl)
+	// aal / amr は session が保持する値をそのまま JWT に反映する。passkey verify で
+	// session が aal2 へ昇格していれば refresh 後もその保証レベルが維持される。
+	aal := "aal1"
+	var amr []store.AMREntry
+	if sess, ok := t.store.GetSession(sessionID); ok {
+		if sess.AAL != "" {
+			aal = sess.AAL
+		}
+		amr = sess.AMR
+	}
 	c := Claims{
 		Subject:      u.ID,
 		Issuer:       t.issuer,
@@ -113,6 +127,8 @@ func (t *Tokens) Build(u *store.User, sessionID, refreshToken string) (*TokenRes
 		SessionID:    sessionID,
 		AppMetadata:  u.AppMetadata,
 		UserMetadata: u.UserMetadata,
+		AAL:          aal,
+		AMR:          amr,
 	}
 	signed, err := jwtv5.NewWithClaims(jwtv5.SigningMethodHS256, c).SignedString([]byte(t.secret))
 	if err != nil {

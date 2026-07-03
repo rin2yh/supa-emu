@@ -18,18 +18,53 @@ const apiVersion = "2024-01-01"
 
 type Func func(*Context)
 
-type Factory struct {
-	store  *store.Store
-	tokens *Tokens
+// WebAuthnConfig は passkey (WebAuthn) の Relying Party 情報。credential creation /
+// request options に載せる。エミュレータは署名検証をしないため値は情報提供目的。
+type WebAuthnConfig struct {
+	RPID     string
+	RPName   string
+	RPOrigin string
 }
 
-func NewFactory(st *store.Store, tk *Tokens) *Factory {
-	return &Factory{store: st, tokens: tk}
+func defaultWebAuthnConfig() WebAuthnConfig {
+	return WebAuthnConfig{RPID: "localhost", RPName: "supa-emu", RPOrigin: "http://localhost:3000"}
+}
+
+type Factory struct {
+	store    *store.Store
+	tokens   *Tokens
+	webauthn WebAuthnConfig
+}
+
+// FactoryOption は NewFactory の任意設定。既存呼び出し (NewFactory(st, tk)) を壊さないため可変長で受ける。
+type FactoryOption func(*Factory)
+
+// WithWebAuthn は passkey の Relying Party 設定を差し込む。未指定なら defaultWebAuthnConfig。
+func WithWebAuthn(cfg WebAuthnConfig) FactoryOption {
+	return func(f *Factory) {
+		if cfg.RPID != "" {
+			f.webauthn.RPID = cfg.RPID
+		}
+		if cfg.RPName != "" {
+			f.webauthn.RPName = cfg.RPName
+		}
+		if cfg.RPOrigin != "" {
+			f.webauthn.RPOrigin = cfg.RPOrigin
+		}
+	}
+}
+
+func NewFactory(st *store.Store, tk *Tokens, opts ...FactoryOption) *Factory {
+	f := &Factory{store: st, tokens: tk, webauthn: defaultWebAuthnConfig()}
+	for _, opt := range opts {
+		opt(f)
+	}
+	return f
 }
 
 func (f *Factory) Handle(fn Func) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		c := &Context{w: w, r: r, store: f.store, tokens: f.tokens}
+		c := &Context{w: w, r: r, store: f.store, tokens: f.tokens, webauthn: f.webauthn}
 		// handler 内 panic を 500 + JSON エラーに変換し、connection reset を防ぐ。
 		defer func() {
 			if rec := recover(); rec != nil {
@@ -44,11 +79,12 @@ func (f *Factory) Handle(fn Func) http.Handler {
 // written フラグで JSON/NoContent/Error 系の二重呼び出しを no-op にし、
 // superfluous WriteHeader / body 連結を防ぐ。
 type Context struct {
-	w       http.ResponseWriter
-	r       *http.Request
-	store   *store.Store
-	tokens  *Tokens
-	written bool
+	w        http.ResponseWriter
+	r        *http.Request
+	store    *store.Store
+	tokens   *Tokens
+	webauthn WebAuthnConfig
+	written  bool
 }
 
 func (c *Context) Request() *http.Request   { return c.r }

@@ -40,13 +40,29 @@ func (s *Store) createSessionLocked(userID string) (*Session, error) {
 	if _, ok := s.users[userID]; !ok {
 		return nil, ErrUserNotFound
 	}
+	now := s.clock()
 	sess := &Session{
 		ID:        uuid.NewString(),
 		UserID:    userID,
-		CreatedAt: s.clock(),
+		CreatedAt: now,
+		// password ログイン由来なので aal1 / amr=[password] で初期化する。
+		// passkey verify で aal2 へ昇格するまではこの値を JWT に載せる。
+		AAL: "aal1",
+		AMR: []AMREntry{{Method: "password", Timestamp: now.Unix()}},
 	}
 	s.sessions[sess.ID] = sess
 	return cloneSession(sess), nil
+}
+
+// GetSession は session の複製を返す。JWT の aal / amr claim を Build 時に読み出すために使う。
+func (s *Store) GetSession(sessionID string) (*Session, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	sess, ok := s.sessions[sessionID]
+	if !ok {
+		return nil, false
+	}
+	return cloneSession(sess), true
 }
 
 func (s *Store) issueRefreshTokenLocked(userID, sessionID string) (*RefreshToken, error) {

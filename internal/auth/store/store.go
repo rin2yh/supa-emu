@@ -17,6 +17,10 @@ type Store struct {
 	// 旧実装は ConsumeRefreshToken の reuse パスで全件走査だったため、長寿命プロセスで
 	// O(N) スキャンがロック競合の原因になっていた。
 	parentToChild map[string]string
+	// factors は factorID -> Factor。user.Factors は cloneUser で本 map から導出するため、
+	// 要素の唯一の真実はここに集約される。challenges は challengeID -> Challenge。
+	factors    map[string]*Factor
+	challenges map[string]*Challenge
 
 	clock         func() time.Time
 	reuseInterval time.Duration
@@ -46,6 +50,8 @@ func New(cfg Config) *Store {
 		sessions:      make(map[string]*Session),
 		refreshTokens: make(map[string]*RefreshToken),
 		parentToChild: make(map[string]string),
+		factors:       make(map[string]*Factor),
+		challenges:    make(map[string]*Challenge),
 		clock:         cfg.Clock,
 		reuseInterval: cfg.ReuseInterval,
 	}
@@ -59,6 +65,8 @@ func (s *Store) Reset() {
 	s.sessions = make(map[string]*Session)
 	s.refreshTokens = make(map[string]*RefreshToken)
 	s.parentToChild = make(map[string]string)
+	s.factors = make(map[string]*Factor)
+	s.challenges = make(map[string]*Challenge)
 }
 
 func (s *Store) Snapshot() Snapshot {
@@ -68,6 +76,8 @@ func (s *Store) Snapshot() Snapshot {
 		Users:         []User{},
 		Sessions:      []Session{},
 		RefreshTokens: []RefreshToken{},
+		Factors:       []Factor{},
+		Challenges:    []Challenge{},
 	}
 	for _, u := range s.users {
 		snap.Users = append(snap.Users, *s.cloneUser(u))
@@ -77,6 +87,12 @@ func (s *Store) Snapshot() Snapshot {
 	}
 	for _, rt := range s.refreshTokens {
 		snap.RefreshTokens = append(snap.RefreshTokens, *cloneRefreshToken(rt))
+	}
+	for _, fct := range s.factors {
+		snap.Factors = append(snap.Factors, *cloneFactor(fct))
+	}
+	for _, ch := range s.challenges {
+		snap.Challenges = append(snap.Challenges, *ch)
 	}
 	return snap
 }
