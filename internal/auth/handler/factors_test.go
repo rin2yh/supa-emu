@@ -149,62 +149,68 @@ func TestPasskeyFlow(t *testing.T) {
 	})
 }
 
-func TestPasskeyValidation(t *testing.T) {
-	t.Run("enroll without a Bearer returns 401 no_authorization", func(t *testing.T) {
-		st := handlertest.NewStore(nil)
-		f := handler.NewFactory(st, handlertest.NewTokens(st, nil))
+// TestEnrollFactorValidation table-drives the EnrollFactor rejection paths that
+// share one setup (a seeded user with an existing "Key" factor). Each case only
+// varies the request body and whether a Bearer is attached.
+func TestEnrollFactorValidation(t *testing.T) {
+	cases := []struct {
+		name       string
+		body       map[string]string
+		withBearer bool
+		wantStatus int
+		wantCode   string
+	}{
+		{
+			name:       "missing Bearer returns 401 no_authorization",
+			body:       map[string]string{"factor_type": "webauthn"},
+			withBearer: false,
+			wantStatus: http.StatusUnauthorized,
+			wantCode:   "no_authorization",
+		},
+		{
+			name:       "unsupported factor_type returns 422 mfa_factor_type_not_supported",
+			body:       map[string]string{"factor_type": "totp"},
+			withBearer: true,
+			wantStatus: http.StatusUnprocessableEntity,
+			wantCode:   "mfa_factor_type_not_supported",
+		},
+		{
+			name:       "duplicate friendly_name returns 422 mfa_factor_name_conflict",
+			body:       map[string]string{"factor_type": "webauthn", "friendly_name": "Key"},
+			withBearer: true,
+			wantStatus: http.StatusUnprocessableEntity,
+			wantCode:   "mfa_factor_name_conflict",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			st := handlertest.NewStore(nil)
+			tk := handlertest.NewTokens(st, nil)
+			f := handler.NewFactory(st, tk)
+			seeded := handlertest.Seed(t, st, tk, "alice@example.com", "password123")
+			enroll(t, f, seeded.AccessToken) // pre-existing "Key" factor for the conflict case
 
-		rec := httptest.NewRecorder()
-		handlertest.Serve(f, handler.EnrollFactor, rec, handlertest.NewRequest(t, http.MethodPost, "/auth/v1/factors", map[string]string{
-			"factor_type": "webauthn",
-		}))
-		if rec.Code != http.StatusUnauthorized {
-			t.Fatalf("status: %d", rec.Code)
-		}
-		if !strings.Contains(rec.Body.String(), "no_authorization") {
-			t.Errorf("body: %s", rec.Body.String())
-		}
-	})
+			req := handlertest.NewRequest(t, http.MethodPost, "/auth/v1/factors", c.body)
+			if c.withBearer {
+				req.Header.Set("Authorization", "Bearer "+seeded.AccessToken)
+			}
+			rec := httptest.NewRecorder()
+			handlertest.Serve(f, handler.EnrollFactor, rec, req)
 
-	t.Run("an unsupported factor_type returns 422 mfa_factor_type_not_supported", func(t *testing.T) {
-		st := handlertest.NewStore(nil)
-		tk := handlertest.NewTokens(st, nil)
-		f := handler.NewFactory(st, tk)
-		seeded := handlertest.Seed(t, st, tk, "alice@example.com", "password123")
-
-		req := handlertest.NewRequest(t, http.MethodPost, "/auth/v1/factors", map[string]string{"factor_type": "totp"})
-		req.Header.Set("Authorization", "Bearer "+seeded.AccessToken)
-		rec := httptest.NewRecorder()
-		handlertest.Serve(f, handler.EnrollFactor, rec, req)
-		if rec.Code != http.StatusUnprocessableEntity {
-			t.Fatalf("status: %d", rec.Code)
-		}
-		if !strings.Contains(rec.Body.String(), "mfa_factor_type_not_supported") {
-			t.Errorf("body: %s", rec.Body.String())
-		}
-	})
-
-	t.Run("a duplicate friendly_name returns 422 mfa_factor_name_conflict", func(t *testing.T) {
-		st := handlertest.NewStore(nil)
-		tk := handlertest.NewTokens(st, nil)
-		f := handler.NewFactory(st, tk)
-		seeded := handlertest.Seed(t, st, tk, "alice@example.com", "password123")
-		enroll(t, f, seeded.AccessToken)
-
-		req := handlertest.NewRequest(t, http.MethodPost, "/auth/v1/factors", map[string]string{
-			"factor_type": "webauthn", "friendly_name": "Key",
+			if rec.Code != c.wantStatus {
+				t.Fatalf("status: got=%d want=%d body=%s", rec.Code, c.wantStatus, rec.Body.String())
+			}
+			if !strings.Contains(rec.Body.String(), c.wantCode) {
+				t.Errorf("body must contain %q: %s", c.wantCode, rec.Body.String())
+			}
 		})
-		req.Header.Set("Authorization", "Bearer "+seeded.AccessToken)
-		rec := httptest.NewRecorder()
-		handlertest.Serve(f, handler.EnrollFactor, rec, req)
-		if rec.Code != http.StatusUnprocessableEntity {
-			t.Fatalf("status: %d body=%s", rec.Code, rec.Body.String())
-		}
-		if !strings.Contains(rec.Body.String(), "mfa_factor_name_conflict") {
-			t.Errorf("body: %s", rec.Body.String())
-		}
-	})
+	}
+}
 
+// The challenge/verify not-found paths hit different handlers with different
+// setups, so they stay as focused subtests rather than a table with per-row
+// handler funcs.
+func TestPasskeyChallengeVerifyNotFound(t *testing.T) {
 	t.Run("verify with an unknown challenge_id returns 404 mfa_challenge_not_found", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
