@@ -61,14 +61,14 @@ The emulator implements **two distinct WebAuthn features** — they share the `-
 
 ## Passwordless passkeys (`auth.passkey.*`)
 
-A passkey is the login itself: `authentication/verify` issues a **new session** from an unauthenticated request (not an `aal2` upgrade). Authentication matches the presented credential id against one persisted at registration, so a client must register before it can authenticate. The `access_token` is signed with the same key as a password login, so app-side `getClaims()` accepts it.
+A passkey is the login itself: `authentication/verify` issues a **new session** from an unauthenticated request (not an `aal2` upgrade). Authentication matches the presented credential id against one persisted at registration, so a client must register before it can authenticate. The `access_token` is signed with the same key as a password login, so app-side `getClaims()` accepts it. The verify response is the standard GoTrue token response at the top level (like the password-login token endpoint), so supabase-js's `_sessionResponse` resolves the session from the top-level `access_token`.
 
 | Method | Path | supabase-js | Response |
 |--------|------|-------------|----------|
 | `POST` | `/auth/v1/passkeys/registration/options` | `passkey.register` (Bearer) | `{ challenge_id, options, expires_at }` |
 | `POST` | `/auth/v1/passkeys/registration/verify` | body `{ challenge_id, credential }` (Bearer) | `{ id, friendly_name?, created_at }` |
 | `POST` | `/auth/v1/passkeys/authentication/options` | `passkey.signIn` (no auth) | `{ challenge_id, options, expires_at }` |
-| `POST` | `/auth/v1/passkeys/authentication/verify` | body `{ challenge_id, credential }` (no auth) | `{ session, user }` |
+| `POST` | `/auth/v1/passkeys/authentication/verify` | body `{ challenge_id, credential }` (no auth) | `{ access_token, refresh_token, user, ... }` (GoTrue token response) |
 
 Challenges are single-use with a 5&nbsp;min TTL. Registration options require a Bearer token; authentication options are discoverable (no auth). The RP id defaults to `127.0.0.1` to match a local E2E origin (`http://127.0.0.1:PORT`).
 
