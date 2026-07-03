@@ -179,7 +179,6 @@ func VerifyFactor(c *Context) {
 		return
 	}
 
-	// The emulator does not verify credential_response signatures, so accept it and proceed.
 	if _, err := c.store.VerifyFactor(factorID); err != nil {
 		if errors.Is(err, store.ErrFactorNotFound) {
 			c.ErrorCode(http.StatusNotFound, "mfa_factor_not_found", "MFA factor not found")
