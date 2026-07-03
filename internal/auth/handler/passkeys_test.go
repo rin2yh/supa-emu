@@ -123,6 +123,48 @@ func TestPasswordlessPasskeyFlow(t *testing.T) {
 	})
 }
 
+func TestPasskeySessionSharesPasswordSigning(t *testing.T) {
+	t.Run("passkey and password access tokens verify under the same key and issuer", func(t *testing.T) {
+		st := handlertest.NewStore(nil)
+		tk := handlertest.NewTokens(st, nil)
+		f := handler.NewFactory(st, tk)
+		// Seed issues a password-login token (tk.Issue), the baseline to match.
+		seeded := handlertest.Seed(t, st, tk, "alice@example.com", "password123")
+		registerPasskey(t, f, seeded.AccessToken, "cred-share-1", "Key")
+
+		challengeID := optionsChallengeID(t, f, handler.PasskeyAuthenticationOptions, "", nil)
+		vReq := handlertest.NewRequest(t, http.MethodPost, "/auth/v1/passkeys/authentication/verify", map[string]any{
+			"challenge_id": challengeID,
+			"credential":   map[string]any{"id": "cred-share-1"},
+		})
+		vRec := httptest.NewRecorder()
+		handlertest.Serve(f, handler.PasskeyAuthenticationVerify, vRec, vReq)
+		if vRec.Code != http.StatusOK {
+			t.Fatalf("authentication verify status: %d body=%s", vRec.Code, vRec.Body.String())
+		}
+		var resp struct {
+			Session handler.TokenResponse `json:"session"`
+		}
+		handlertest.DecodeJSON(t, vRec, &resp)
+
+		// Both tokens must verify under the same tokens instance. tk.Verify enforces
+		// the signing key (HS256 secret) and the issuer (WithIssuer), so a passkey
+		// token signed with a different key or issuer than password login would fail
+		// here — which would break app-side getClaims().
+		pwClaims, err := tk.Verify(seeded.AccessToken)
+		if err != nil {
+			t.Fatalf("verify password-login token: %v", err)
+		}
+		pkClaims, err := tk.Verify(resp.Session.AccessToken)
+		if err != nil {
+			t.Fatalf("verify passkey token: %v", err)
+		}
+		if pkClaims.Issuer == "" || pkClaims.Issuer != pwClaims.Issuer {
+			t.Errorf("issuer mismatch: passkey=%q password=%q", pkClaims.Issuer, pwClaims.Issuer)
+		}
+	})
+}
+
 func TestPasskeyRegistrationRequiresAuth(t *testing.T) {
 	t.Run("registration/options without a Bearer returns 401 no_authorization", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
