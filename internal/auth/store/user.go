@@ -103,10 +103,9 @@ func (s *Store) DeleteUser(id string) error {
 		}
 	}
 	// Cascade-delete the user's passkeys and any registration challenges they own.
-	for pid, pk := range s.passkeys {
+	for _, pk := range s.passkeys {
 		if pk.UserID == id {
-			delete(s.passkeys, pid)
-			delete(s.passkeyByCred, pk.CredentialID)
+			s.deletePasskeyLocked(pk)
 		}
 	}
 	for cid, ch := range s.passkeyChallenges {

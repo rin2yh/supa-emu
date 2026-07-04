@@ -88,6 +88,42 @@ func (s *Store) AddPasskey(userID, friendlyName, credentialID string) (*Passkey,
 	return clonePasskey(pk), nil
 }
 
+// DeletePasskey removes a user's own passkey by its passkey ID. A passkey that
+// does not exist, or is owned by a different user, yields ErrPasskeyNotFound so
+// a caller cannot distinguish "not found" from "not yours".
+func (s *Store) DeletePasskey(userID, passkeyID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	pk, ok := s.passkeys[passkeyID]
+	if !ok || pk.UserID != userID {
+		return ErrPasskeyNotFound
+	}
+	s.deletePasskeyLocked(pk)
+	return nil
+}
+
+// deletePasskeyLocked removes a passkey and its credential index entry. It
+// assumes the write lock is held and keeps the removal in one place, shared by
+// DeletePasskey (single delete) and DeleteUser (cascade), mirroring
+// deleteFactorLocked.
+func (s *Store) deletePasskeyLocked(pk *Passkey) {
+	delete(s.passkeys, pk.ID)
+	delete(s.passkeyByCred, pk.CredentialID)
+}
+
+// MarkPasskeyUsed stamps a passkey's LastUsedAt with the current time after a
+// successful authentication. A missing passkey is a no-op.
+func (s *Store) MarkPasskeyUsed(passkeyID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	pk, ok := s.passkeys[passkeyID]
+	if !ok {
+		return
+	}
+	now := s.clock()
+	pk.LastUsedAt = &now
+}
+
 // FindPasskeyByCredentialID resolves the credential presented during an
 // authentication ceremony back to its stored passkey (and thus its owner).
 func (s *Store) FindPasskeyByCredentialID(credentialID string) (*Passkey, bool) {
@@ -112,7 +148,9 @@ func (s *Store) ListUserPasskeys(userID string) []Passkey {
 	out := make([]Passkey, 0)
 	for _, pk := range s.passkeys {
 		if pk.UserID == userID {
-			// Passkey has no reference fields, so a value copy fully detaches it.
+			// A value copy detaches the passkey; its only pointer field,
+			// LastUsedAt, is reassigned (never mutated in place) on use, so the
+			// shared pointer is safe to alias.
 			out = append(out, *pk)
 		}
 	}

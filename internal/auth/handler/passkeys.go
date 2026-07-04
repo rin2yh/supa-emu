@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/rin2yh/supa-emu/internal/auth/store"
 )
@@ -183,6 +184,8 @@ func PasskeyAuthenticationVerify(c *Context) {
 			"No passkey found for the provided credential")
 		return
 	}
+	// Record the successful use so it surfaces as last_used_at in the list.
+	c.store.MarkPasskeyUsed(pk.ID)
 
 	// A passkey login is single-factor primary auth: aal1 with amr=[webauthn],
 	// signed with the same key as password login.
@@ -192,6 +195,59 @@ func PasskeyAuthenticationVerify(c *Context) {
 		return
 	}
 	c.JSON(http.StatusOK, tr)
+}
+
+// passkeyListItem is one entry of the PasskeyList response. last_used_at has no
+// omitempty so it serializes as null until first use (matching supabase-js's
+// PasskeyListItem), while friendly_name is dropped when empty.
+type passkeyListItem struct {
+	ID           string     `json:"id"`
+	FriendlyName string     `json:"friendly_name,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
+	LastUsedAt   *time.Time `json:"last_used_at"`
+}
+
+// PasskeyList returns the authenticated user's registered passkeys
+// (GET /auth/v1/passkeys). Requires a Bearer token.
+//
+// The body is a top-level JSON array, not an object: supabase-js's
+// auth.passkey.list() uses xform: (data) => ({ data }), handing the raw array
+// back to the caller as PasskeyListItem[], so wrapping it under a key would make
+// the client see no passkeys.
+func PasskeyList(c *Context) {
+	u, _, ok := requireUser(c)
+	if !ok {
+		return
+	}
+	passkeys := c.store.ListUserPasskeys(u.ID)
+	items := make([]passkeyListItem, 0, len(passkeys))
+	for _, pk := range passkeys {
+		items = append(items, passkeyListItem{
+			ID:           pk.ID,
+			FriendlyName: pk.FriendlyName,
+			CreatedAt:    pk.CreatedAt,
+			LastUsedAt:   pk.LastUsedAt,
+		})
+	}
+	c.JSON(http.StatusOK, items)
+}
+
+// PasskeyDelete removes one of the authenticated user's passkeys by its passkey
+// ID (DELETE /auth/v1/passkeys/{id}). The {id} is the passkey record ID returned
+// by registration/verify and listed by PasskeyList, not the credential id.
+// Requires a Bearer token; a passkey that does not exist or belongs to another
+// user yields 404, mirroring the factors unenroll contract.
+func PasskeyDelete(c *Context) {
+	u, _, ok := requireUser(c)
+	if !ok {
+		return
+	}
+	id := c.Path("id")
+	if err := c.store.DeletePasskey(u.ID, id); err != nil {
+		c.ErrorCode(http.StatusNotFound, "passkey_not_found", "passkey not found")
+		return
+	}
+	c.JSON(http.StatusOK, map[string]any{"id": id})
 }
 
 // writePasskeyChallengeError maps a ConsumePasskeyChallenge error to its response.

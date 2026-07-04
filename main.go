@@ -53,6 +53,9 @@ func run(args []string) error {
 	mux.Handle("POST /auth/v1/passkeys/registration/verify", f.Handle(handler.PasskeyRegistrationVerify))
 	mux.Handle("POST /auth/v1/passkeys/authentication/options", f.Handle(handler.PasskeyAuthenticationOptions))
 	mux.Handle("POST /auth/v1/passkeys/authentication/verify", f.Handle(handler.PasskeyAuthenticationVerify))
+	// Passkey management (user-scoped): list + delete the caller's own passkeys.
+	mux.Handle("GET /auth/v1/passkeys", f.Handle(handler.PasskeyList))
+	mux.Handle("DELETE /auth/v1/passkeys/{id}", f.Handle(handler.PasskeyDelete))
 	mux.Handle("GET /auth/v1/admin/users", f.Handle(handler.AdminListUsers))
 	mux.Handle("DELETE /auth/v1/admin/users/{id}", f.Handle(handler.AdminDeleteUser))
 	mux.Handle("POST /__emulator/reset", f.Handle(handler.Reset))

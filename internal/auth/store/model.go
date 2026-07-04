@@ -97,6 +97,10 @@ type Passkey struct {
 	FriendlyName string    `json:"friendly_name,omitempty"`
 	CredentialID string    `json:"credential_id"`
 	CreatedAt    time.Time `json:"created_at"`
+	// LastUsedAt is the time of the passkey's most recent successful
+	// authentication, nil until it has been used at least once. It backs the
+	// last_used_at field of auth.passkey.list().
+	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
 }
 
 // PasskeyChallenge is a single-use passkey ceremony challenge. Registration
