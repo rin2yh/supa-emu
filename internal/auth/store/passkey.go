@@ -98,9 +98,17 @@ func (s *Store) DeletePasskey(userID, passkeyID string) error {
 	if !ok || pk.UserID != userID {
 		return ErrPasskeyNotFound
 	}
-	delete(s.passkeys, passkeyID)
-	delete(s.passkeyByCred, pk.CredentialID)
+	s.deletePasskeyLocked(pk)
 	return nil
+}
+
+// deletePasskeyLocked removes a passkey and its credential index entry. It
+// assumes the write lock is held and keeps the removal in one place, shared by
+// DeletePasskey (single delete) and DeleteUser (cascade), mirroring
+// deleteFactorLocked.
+func (s *Store) deletePasskeyLocked(pk *Passkey) {
+	delete(s.passkeys, pk.ID)
+	delete(s.passkeyByCred, pk.CredentialID)
 }
 
 // MarkPasskeyUsed stamps a passkey's LastUsedAt with the current time after a
@@ -140,7 +148,9 @@ func (s *Store) ListUserPasskeys(userID string) []Passkey {
 	out := make([]Passkey, 0)
 	for _, pk := range s.passkeys {
 		if pk.UserID == userID {
-			// Passkey has no reference fields, so a value copy fully detaches it.
+			// A value copy detaches the passkey; its only pointer field,
+			// LastUsedAt, is reassigned (never mutated in place) on use, so the
+			// shared pointer is safe to alias.
 			out = append(out, *pk)
 		}
 	}

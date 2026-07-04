@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/rin2yh/supa-emu/internal/auth/store"
 )
@@ -196,6 +197,16 @@ func PasskeyAuthenticationVerify(c *Context) {
 	c.JSON(http.StatusOK, tr)
 }
 
+// passkeyListItem is one entry of the PasskeyList response. last_used_at has no
+// omitempty so it serializes as null until first use (matching supabase-js's
+// PasskeyListItem), while friendly_name is dropped when empty.
+type passkeyListItem struct {
+	ID           string     `json:"id"`
+	FriendlyName string     `json:"friendly_name,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
+	LastUsedAt   *time.Time `json:"last_used_at"`
+}
+
 // PasskeyList returns the authenticated user's registered passkeys
 // (GET /auth/v1/passkeys). Requires a Bearer token.
 //
@@ -209,17 +220,14 @@ func PasskeyList(c *Context) {
 		return
 	}
 	passkeys := c.store.ListUserPasskeys(u.ID)
-	items := make([]map[string]any, 0, len(passkeys))
+	items := make([]passkeyListItem, 0, len(passkeys))
 	for _, pk := range passkeys {
-		item := map[string]any{
-			"id":           pk.ID,
-			"created_at":   pk.CreatedAt,
-			"last_used_at": pk.LastUsedAt, // *time.Time: null until first use
-		}
-		if pk.FriendlyName != "" {
-			item["friendly_name"] = pk.FriendlyName
-		}
-		items = append(items, item)
+		items = append(items, passkeyListItem{
+			ID:           pk.ID,
+			FriendlyName: pk.FriendlyName,
+			CreatedAt:    pk.CreatedAt,
+			LastUsedAt:   pk.LastUsedAt,
+		})
 	}
 	c.JSON(http.StatusOK, items)
 }

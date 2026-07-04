@@ -65,6 +65,22 @@ func registerPasskey(t *testing.T, f *handler.Factory, bearer, credID, friendlyN
 	return reg.ID
 }
 
+// listPasskeys calls GET /auth/v1/passkeys for the bearer and returns the decoded
+// top-level array, failing the test if the status is not 200.
+func listPasskeys(t *testing.T, f *handler.Factory, bearer string) []map[string]any {
+	t.Helper()
+	req := handlertest.NewRequest(t, http.MethodGet, "/auth/v1/passkeys", nil)
+	req.Header.Set("Authorization", "Bearer "+bearer)
+	rec := httptest.NewRecorder()
+	handlertest.Serve(f, handler.PasskeyList, rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list status: %d body=%s", rec.Code, rec.Body.String())
+	}
+	var list []map[string]any
+	handlertest.DecodeJSON(t, rec, &list)
+	return list
+}
+
 func TestPasskeyList(t *testing.T) {
 	t.Run("returns the caller's passkeys as a top-level JSON array", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
@@ -73,18 +89,9 @@ func TestPasskeyList(t *testing.T) {
 		seeded := handlertest.Seed(t, st, tk, "alice@example.com", "password123")
 		id := registerPasskey(t, f, seeded.AccessToken, "cred-list-1", "My device")
 
-		req := handlertest.NewRequest(t, http.MethodGet, "/auth/v1/passkeys", nil)
-		req.Header.Set("Authorization", "Bearer "+seeded.AccessToken)
-		rec := httptest.NewRecorder()
-		handlertest.Serve(f, handler.PasskeyList, rec, req)
-		if rec.Code != http.StatusOK {
-			t.Fatalf("status: %d body=%s", rec.Code, rec.Body.String())
-		}
-
 		// The body must be a top-level array (not wrapped under a key), since
 		// supabase-js auth.passkey.list() hands the raw array back as PasskeyListItem[].
-		var list []map[string]any
-		handlertest.DecodeJSON(t, rec, &list)
+		list := listPasskeys(t, f, seeded.AccessToken)
 		if len(list) != 1 {
 			t.Fatalf("expected 1 passkey, got %d: %+v", len(list), list)
 		}
@@ -137,12 +144,7 @@ func TestPasskeyList(t *testing.T) {
 			t.Fatalf("authentication verify status: %d body=%s", vRec.Code, vRec.Body.String())
 		}
 
-		req := handlertest.NewRequest(t, http.MethodGet, "/auth/v1/passkeys", nil)
-		req.Header.Set("Authorization", "Bearer "+seeded.AccessToken)
-		rec := httptest.NewRecorder()
-		handlertest.Serve(f, handler.PasskeyList, rec, req)
-		var list []map[string]any
-		handlertest.DecodeJSON(t, rec, &list)
+		list := listPasskeys(t, f, seeded.AccessToken)
 		if len(list) != 1 || list[0]["last_used_at"] == nil {
 			t.Fatalf("last_used_at should be set after auth: %+v", list)
 		}
@@ -173,13 +175,7 @@ func TestPasskeyDelete(t *testing.T) {
 		}
 
 		// Now the list is empty.
-		lReq := handlertest.NewRequest(t, http.MethodGet, "/auth/v1/passkeys", nil)
-		lReq.Header.Set("Authorization", "Bearer "+seeded.AccessToken)
-		lRec := httptest.NewRecorder()
-		handlertest.Serve(f, handler.PasskeyList, lRec, lReq)
-		var list []map[string]any
-		handlertest.DecodeJSON(t, lRec, &list)
-		if len(list) != 0 {
+		if list := listPasskeys(t, f, seeded.AccessToken); len(list) != 0 {
 			t.Errorf("passkey not deleted: %+v", list)
 		}
 	})
