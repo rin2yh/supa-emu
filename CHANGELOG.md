@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.1.5](https://github.com/rin2yh/supa-emu/compare/v0.1.4...v0.1.5) - 2026-07-12
+- feat(identities): add linkIdentity authorize endpoint by @rin2yh in https://github.com/rin2yh/supa-emu/pull/10
+
 ## [v0.1.4](https://github.com/rin2yh/supa-emu/compare/v0.1.3...v0.1.4) - 2026-07-04
 - feat(passkeys): add user-scoped list and delete endpoints by @rin2yh in https://github.com/rin2yh/supa-emu/pull/8
 
