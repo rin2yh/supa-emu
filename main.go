@@ -42,6 +42,8 @@ func run(args []string) error {
 	mux.Handle("POST /auth/v1/signup", f.Handle(handler.Signup))
 	mux.Handle("POST /auth/v1/token", f.Handle(handler.Token))
 	mux.Handle("GET /auth/v1/user", f.Handle(handler.GetUser))
+	// Manual identity linking (auth.linkIdentity): start the OAuth link flow.
+	mux.Handle("GET /auth/v1/user/identities/authorize", f.Handle(handler.LinkIdentityAuthorize))
 	mux.Handle("POST /auth/v1/logout", f.Handle(handler.Logout))
 	// WebAuthn MFA (second factor): enroll -> challenge -> verify -> unenroll
 	mux.Handle("POST /auth/v1/factors", f.Handle(handler.EnrollFactor))
