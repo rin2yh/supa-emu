@@ -26,13 +26,11 @@ import (
 // providerAuthorizeEndpoints maps a supported external provider to its real
 // OAuth authorize endpoint. The emulator does not drive the flow, so the base is
 // only used to make the returned URL recognizable (a real GitHub authorize URL
-// for provider=github); unknown providers fall back to a local dummy endpoint.
+// for provider=github); unknown providers fall back to the emulator's own base
+// URL. Only github — the provider the emulator is exercised with — is listed;
+// others are intentionally left to the fallback rather than hard-coded here.
 var providerAuthorizeEndpoints = map[string]string{
-	"github":    "https://github.com/login/oauth/authorize",
-	"google":    "https://accounts.google.com/o/oauth2/v2/auth",
-	"gitlab":    "https://gitlab.com/oauth/authorize",
-	"bitbucket": "https://bitbucket.org/site/oauth2/authorize",
-	"azure":     "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+	"github": "https://github.com/login/oauth/authorize",
 }
 
 // LinkIdentityAuthorize starts a manual identity-link OAuth flow for the
@@ -53,11 +51,11 @@ func LinkIdentityAuthorize(c *Context) {
 
 	provider := strings.TrimSpace(c.Query("provider"))
 	if provider == "" {
-		c.ErrorCode(http.StatusBadRequest, "validation_failed", "provider is required")
+		c.ErrorCode(http.StatusUnprocessableEntity, "validation_failed", "provider is required")
 		return
 	}
 
-	authorizeURL := buildAuthorizeURL(provider, c.Query("redirect_to"),
+	authorizeURL := buildAuthorizeURL(c.tokens.issuer, provider, c.Query("redirect_to"),
 		c.Query("code_challenge"), c.Query("code_challenge_method"))
 
 	// supabase-js sends skip_http_redirect=true when skipBrowserRedirect is set so
@@ -75,13 +73,17 @@ func LinkIdentityAuthorize(c *Context) {
 // buildAuthorizeURL constructs the provider authorize URL echoed back to the
 // client. The emulator does not complete the OAuth exchange, so a fresh opaque
 // state is minted per call and the PKCE parameters are passed through verbatim;
-// the values only need to be well-formed, not honored.
-func buildAuthorizeURL(provider, redirectTo, codeChallenge, codeChallengeMethod string) string {
+// the values only need to be well-formed, not honored. issuer is the emulator's
+// own configured base URL (JWT issuer), used to keep the fallback authorize URL
+// on the same host the emulator is actually served from.
+func buildAuthorizeURL(issuer, provider, redirectTo, codeChallenge, codeChallengeMethod string) string {
 	base, ok := providerAuthorizeEndpoints[provider]
 	if !ok {
 		// Unknown providers still get a syntactically valid, provider-scoped URL so
 		// clients can assert on it without the emulator hard-coding every provider.
-		base = "http://127.0.0.1:54321/auth/v1/authorize/" + url.PathEscape(provider)
+		// Deriving it from the configured issuer keeps it correct under -addr /
+		// -jwt-issuer instead of pinning the default 127.0.0.1:54321 host.
+		base = issuer + "/authorize/" + url.PathEscape(provider)
 	}
 
 	q := url.Values{}

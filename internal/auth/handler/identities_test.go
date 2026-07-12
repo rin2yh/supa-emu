@@ -83,7 +83,7 @@ func TestLinkIdentityAuthorize(t *testing.T) {
 		}
 	})
 
-	t.Run("provider 欠落は 400 validation_failed", func(t *testing.T) {
+	t.Run("provider 欠落は 422 validation_failed", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)
@@ -94,7 +94,7 @@ func TestLinkIdentityAuthorize(t *testing.T) {
 		rec := httptest.NewRecorder()
 		handlertest.Serve(f, handler.LinkIdentityAuthorize, rec, req)
 
-		if rec.Code != http.StatusBadRequest {
+		if rec.Code != http.StatusUnprocessableEntity {
 			t.Fatalf("status: %d", rec.Code)
 		}
 		if !strings.Contains(rec.Body.String(), `"error_code":"validation_failed"`) {
