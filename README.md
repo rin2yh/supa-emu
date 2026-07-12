@@ -53,7 +53,7 @@ Inputs: `version` (default `latest`), `addr` (default `127.0.0.1:54321`), `jwt-s
 
 ## Endpoints
 
-Supports `/auth/v1/*` (health, settings, signup, token, user, logout, factors, passkeys, admin/users) plus `/__emulator/*` test helpers (reset, snapshot, users). Unmatched paths return `404`.
+Supports `/auth/v1/*` (health, settings, signup, token, user, logout, factors, passkeys, identities, admin/users) plus `/__emulator/*` test helpers (reset, snapshot, users). Unmatched paths return `404`.
 
 In-memory only, no apikey validation, HS256 fixed. OAuth / Phone / TOTP / email / Realtime / Storage are out of scope.
 
@@ -90,6 +90,16 @@ A second factor that upgrades an existing session to `aal2`; also drives `getAut
 Flow: `enroll` creates an `unverified` factor and returns `credential_creation_options`; `challenge` issues a single-use challenge (5&nbsp;min TTL) with creation options (registration) or request options (authentication); `verify` consumes the challenge, marks the factor `verified`, upgrades the session to `aal2`, and returns a rotated `access_token` / `refresh_token`. Factors appear on `GET /auth/v1/user` under `factors`, backing `mfa.listFactors()`.
 
 Relying Party defaults (`127.0.0.1` / `supa-emu`) are overridable via `-webauthn-rp-id`, `-webauthn-rp-name`.
+
+## Manual identity linking (`auth.linkIdentity`)
+
+Starts the OAuth "link" flow that attaches an external provider identity (e.g. GitHub) to the **already-signed-in** account. Requires a Bearer access token.
+
+| Method | Path | supabase-js |
+|--------|------|-------------|
+| `GET` | `/auth/v1/user/identities/authorize` | `linkIdentity({ provider, options: { redirectTo, skipBrowserRedirect } })` |
+
+Query: `provider` (required), `redirect_to`, `code_challenge`, `code_challenge_method`, `skip_http_redirect`. When `skip_http_redirect=true` (set by `skipBrowserRedirect: true`), the emulator answers **`200` with `{ "url": "<authorize URL>" }`** instead of a `302`, matching GoTrue; otherwise it returns an empty-body `302` with a `Location` to the same URL. The URL points at the emulator's **own local `/auth/v1/authorize`** (derived from the configured issuer, with `provider` as a query param) — the same local entry point as `signInWithOAuth`, so a link flow stays local instead of bouncing out to the real provider. The emulator does not complete the OAuth round trip or verify PKCE — a fresh `state` is minted and the PKCE / `redirect_to` params are echoed through. Unauthenticated requests get `401` with the shared `no_authorization` / `bad_jwt` / `session_not_found` classification; a missing `provider` returns `422 validation_failed`. Linked identities are read from the existing `GET /auth/v1/user` response under `identities` (backing `getUserIdentities()`); the callback that actually attaches the identity is out of scope.
 
 ## License
 
