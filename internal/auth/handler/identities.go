@@ -20,18 +20,14 @@ import (
 //
 // As with the passkey / MFA emulators, the emulator does not perform the real
 // OAuth round trip or verify PKCE. It only reproduces GoTrue's HTTP contract:
-// authenticate the caller, then hand back a provider authorize URL (200 with
+// authenticate the caller, then hand back an authorize URL (200 with
 // { "url": ... } when skip_http_redirect is set, otherwise a 302 redirect).
-
-// providerAuthorizeEndpoints maps a supported external provider to its real
-// OAuth authorize endpoint. The emulator does not drive the flow, so the base is
-// only used to make the returned URL recognizable (a real GitHub authorize URL
-// for provider=github); unknown providers fall back to the emulator's own base
-// URL. Only github — the provider the emulator is exercised with — is listed;
-// others are intentionally left to the fallback rather than hard-coded here.
-var providerAuthorizeEndpoints = map[string]string{
-	"github": "https://github.com/login/oauth/authorize",
-}
+//
+// The URL points at the emulator's own local /auth/v1/authorize entry point
+// (the same one signInWithOAuth uses) rather than the real provider, so a link
+// flow stays local and consistent with login instead of bouncing an E2E run out
+// to github.com. The callback that would actually attach the identity is out of
+// scope; only the authorize (link start) contract is emulated here.
 
 // LinkIdentityAuthorize starts a manual identity-link OAuth flow for the
 // authenticated user (GET /auth/v1/user/identities/authorize). Requires a Bearer
@@ -65,31 +61,21 @@ func LinkIdentityAuthorize(c *Context) {
 		c.JSON(http.StatusOK, map[string]any{"url": authorizeURL})
 		return
 	}
-
-	c.Header().Set("Location", authorizeURL)
-	c.JSON(http.StatusFound, nil)
+	c.Redirect(http.StatusFound, authorizeURL)
 }
 
-// buildAuthorizeURL constructs the provider authorize URL echoed back to the
-// client. The emulator does not complete the OAuth exchange, so a fresh opaque
-// state is minted per call and the PKCE parameters are passed through verbatim;
-// the values only need to be well-formed, not honored. issuer is the emulator's
-// own configured base URL (JWT issuer), used to keep the fallback authorize URL
-// on the same host the emulator is actually served from.
+// buildAuthorizeURL constructs the local authorize URL echoed back to the client:
+// the emulator's own /auth/v1/authorize (derived from the configured issuer, so
+// it tracks -addr / -jwt-issuer) with the provider carried as a query parameter,
+// matching signInWithOAuth. Every provider resolves to the same local endpoint;
+// the emulator does not complete the OAuth exchange, so a fresh opaque state is
+// minted per call and the PKCE parameters are passed through verbatim — the
+// values only need to be well-formed, not honored.
 func buildAuthorizeURL(issuer, provider, redirectTo, codeChallenge, codeChallengeMethod string) string {
-	base, ok := providerAuthorizeEndpoints[provider]
-	if !ok {
-		// Unknown providers still get a syntactically valid, provider-scoped URL so
-		// clients can assert on it without the emulator hard-coding every provider.
-		// Deriving it from the configured issuer keeps it correct under -addr /
-		// -jwt-issuer instead of pinning the default 127.0.0.1:54321 host.
-		base = issuer + "/authorize/" + url.PathEscape(provider)
-	}
-
 	q := url.Values{}
+	q.Set("provider", provider)
 	q.Set("client_id", "supa-emu")
 	q.Set("response_type", "code")
-	q.Set("provider", provider)
 	q.Set("state", uuid.NewString())
 	if redirectTo != "" {
 		q.Set("redirect_to", redirectTo)
@@ -100,7 +86,7 @@ func buildAuthorizeURL(issuer, provider, redirectTo, codeChallenge, codeChalleng
 	if codeChallengeMethod != "" {
 		q.Set("code_challenge_method", codeChallengeMethod)
 	}
-	return base + "?" + q.Encode()
+	return issuer + "/authorize?" + q.Encode()
 }
 
 // isTruthy reports whether a query flag should be treated as set. supabase-js

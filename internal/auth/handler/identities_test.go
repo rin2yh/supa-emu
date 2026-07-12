@@ -41,10 +41,14 @@ func TestLinkIdentityAuthorize(t *testing.T) {
 		if err != nil {
 			t.Fatalf("url parse: %v", err)
 		}
-		// The github provider maps to a recognizable GitHub authorize URL, with the
-		// PKCE + redirect params passed through.
-		if !strings.Contains(u.Host, "github.com") {
-			t.Errorf("host want github.com, url=%s", resp.URL)
+		// The authorize URL stays local (the emulator's own /auth/v1/authorize,
+		// like signInWithOAuth) rather than bouncing to the real provider, with the
+		// provider + PKCE + redirect params passed through.
+		if u.Path != "/auth/v1/authorize" {
+			t.Errorf("path want /auth/v1/authorize, url=%s", resp.URL)
+		}
+		if strings.Contains(u.Host, "github.com") {
+			t.Errorf("host should stay local, not github.com, url=%s", resp.URL)
 		}
 		q := u.Query()
 		if got := q.Get("provider"); got != "github" {
@@ -78,8 +82,46 @@ func TestLinkIdentityAuthorize(t *testing.T) {
 		if rec.Code != http.StatusFound {
 			t.Fatalf("status: %d body=%s", rec.Code, rec.Body.String())
 		}
-		if loc := rec.Header().Get("Location"); !strings.Contains(loc, "github.com") {
-			t.Errorf("Location want github.com, got %q", loc)
+		if loc := rec.Header().Get("Location"); !strings.Contains(loc, "/auth/v1/authorize") {
+			t.Errorf("Location want /auth/v1/authorize, got %q", loc)
+		}
+		// GoTrue's redirect is an empty-body 302; it must not carry a JSON body.
+		if body := rec.Body.String(); body != "" {
+			t.Errorf("302 body want empty, got %q", body)
+		}
+		if ct := rec.Header().Get("Content-Type"); ct != "" {
+			t.Errorf("302 Content-Type want empty, got %q", ct)
+		}
+	})
+
+	t.Run("github 以外のプロバイダも同じローカル authorize に寄せる", func(t *testing.T) {
+		st := handlertest.NewStore(nil)
+		tk := handlertest.NewTokens(st, nil)
+		f := handler.NewFactory(st, tk)
+		seeded := handlertest.Seed(t, st, tk, "alice@example.com", "password123")
+
+		req := handlertest.NewRequest(t, http.MethodGet,
+			"/auth/v1/user/identities/authorize?provider=google&skip_http_redirect=true", nil)
+		req.Header.Set("Authorization", "Bearer "+seeded.AccessToken)
+		rec := httptest.NewRecorder()
+		handlertest.Serve(f, handler.LinkIdentityAuthorize, rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status: %d body=%s", rec.Code, rec.Body.String())
+		}
+		var resp struct {
+			URL string `json:"url"`
+		}
+		handlertest.DecodeJSON(t, rec, &resp)
+		u, err := url.Parse(resp.URL)
+		if err != nil {
+			t.Fatalf("url parse: %v", err)
+		}
+		if u.Path != "/auth/v1/authorize" {
+			t.Errorf("path want /auth/v1/authorize, url=%s", resp.URL)
+		}
+		if got := u.Query().Get("provider"); got != "google" {
+			t.Errorf("provider=%q url=%s", got, resp.URL)
 		}
 	})
 

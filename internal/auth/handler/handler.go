@@ -124,6 +124,18 @@ func (c *Context) JSON(status int, body any) {
 	}
 }
 
+// Redirect writes a bare redirect: a Location header and the status, with no
+// body and no Content-Type. GoTrue's OAuth redirect is an empty-body 302, so
+// this avoids tagging it with application/json (as c.JSON(status, nil) would).
+func (c *Context) Redirect(status int, location string) {
+	if c.written {
+		return
+	}
+	c.written = true
+	c.w.Header().Set("Location", location)
+	c.w.WriteHeader(status)
+}
+
 // RFC 7230 §3.3.2 に従い、204 では Content-Type / Content-Length を出さない。
 func (c *Context) NoContent() {
 	if c.written {
