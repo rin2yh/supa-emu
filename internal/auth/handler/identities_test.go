@@ -6,9 +6,11 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/rin2yh/supa-emu/internal/auth/handler"
 	"github.com/rin2yh/supa-emu/internal/auth/handler/handlertest"
+	"github.com/rin2yh/supa-emu/internal/config"
 )
 
 func TestLinkIdentityAuthorize(t *testing.T) {
@@ -122,6 +124,38 @@ func TestLinkIdentityAuthorize(t *testing.T) {
 		}
 		if got := u.Query().Get("provider"); got != "google" {
 			t.Errorf("provider=%q url=%s", got, resp.URL)
+		}
+	})
+
+	t.Run("末尾スラッシュ付き issuer でも二重スラッシュにならない", func(t *testing.T) {
+		st := handlertest.NewStore(nil)
+		// Issuer with a trailing slash must not produce "…//authorize".
+		tk := handler.NewTokens(st, config.DefaultJWTSecret, handlertest.Issuer+"/", time.Hour, nil)
+		f := handler.NewFactory(st, tk)
+		seeded := handlertest.Seed(t, st, tk, "alice@example.com", "password123")
+
+		req := handlertest.NewRequest(t, http.MethodGet,
+			"/auth/v1/user/identities/authorize?provider=github&skip_http_redirect=true", nil)
+		req.Header.Set("Authorization", "Bearer "+seeded.AccessToken)
+		rec := httptest.NewRecorder()
+		handlertest.Serve(f, handler.LinkIdentityAuthorize, rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status: %d body=%s", rec.Code, rec.Body.String())
+		}
+		var resp struct {
+			URL string `json:"url"`
+		}
+		handlertest.DecodeJSON(t, rec, &resp)
+		if strings.Contains(resp.URL, "//auth/v1/authorize") {
+			t.Errorf("double slash in url=%s", resp.URL)
+		}
+		u, err := url.Parse(resp.URL)
+		if err != nil {
+			t.Fatalf("url parse: %v", err)
+		}
+		if u.Path != "/auth/v1/authorize" {
+			t.Errorf("path want /auth/v1/authorize, url=%s", resp.URL)
 		}
 	})
 

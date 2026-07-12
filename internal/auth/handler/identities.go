@@ -86,7 +86,9 @@ func buildAuthorizeURL(issuer, provider, redirectTo, codeChallenge, codeChalleng
 	if codeChallengeMethod != "" {
 		q.Set("code_challenge_method", codeChallengeMethod)
 	}
-	return issuer + "/authorize?" + q.Encode()
+	// TrimSuffix guards against a configured issuer with a trailing slash, which
+	// would otherwise yield "…//authorize".
+	return strings.TrimSuffix(issuer, "/") + "/authorize?" + q.Encode()
 }
 
 // isTruthy reports whether a query flag should be treated as set. supabase-js
