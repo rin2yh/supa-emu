@@ -1,6 +1,7 @@
 package handler_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -254,7 +255,7 @@ func TestUnlinkIdentity(t *testing.T) {
 		return ""
 	}
 
-	t.Run("success: a seeded github identity can be unlinked with 204", func(t *testing.T) {
+	t.Run("success: a seeded github identity can be unlinked with 200 and a JSON body", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)
@@ -267,11 +268,14 @@ func TestUnlinkIdentity(t *testing.T) {
 		rec := httptest.NewRecorder()
 		handlertest.Serve(f, handler.UnlinkIdentity, rec, req)
 
-		if rec.Code != http.StatusNoContent {
+		if rec.Code != http.StatusOK {
 			t.Fatalf("status: %d body=%s", rec.Code, rec.Body.String())
 		}
-		if body := rec.Body.String(); body != "" {
-			t.Errorf("204 body want empty, got %q", body)
+		// supabase-js auth-js unconditionally parses the response body, so the
+		// success response must carry valid JSON rather than an empty 204.
+		var body map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+			t.Errorf("200 body want valid JSON, got %q (%v)", rec.Body.String(), err)
 		}
 		// The github identity must be gone; only email remains.
 		u, ok := st.FindUserByID(seeded.User.ID)

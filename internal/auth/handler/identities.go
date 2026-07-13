@@ -77,7 +77,10 @@ func LinkIdentityAuthorize(c *Context) {
 // GoTrue refuses to remove a user's only identity (a user must retain at least
 // one), reported here as 422 single_identity_not_deletable. A path id that does
 // not match any of the user's identities returns 404 identity_not_found. On
-// success it returns an empty 204, matching GoTrue.
+// success it returns 200 with a JSON body ({}), matching GoTrue: supabase-js
+// auth-js unconditionally parses the response body (its _handleRequest calls
+// result.json() with no noResolveJson), so an empty body would raise
+// "Unexpected end of JSON input" and fail the unlink.
 func UnlinkIdentity(c *Context) {
 	u, _, ok := requireUser(c)
 	if !ok {
@@ -104,7 +107,7 @@ func UnlinkIdentity(c *Context) {
 		}
 		return
 	}
-	c.NoContent()
+	c.JSON(http.StatusOK, map[string]any{})
 }
 
 // buildAuthorizeURL constructs the local authorize URL echoed back to the client:
