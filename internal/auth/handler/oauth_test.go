@@ -31,7 +31,7 @@ func authorizeCode(t *testing.T, f *handler.Factory, target string) (string, *ht
 func TestOAuthRoundTrip(t *testing.T) {
 	const callback = "http://127.0.0.1:3000/auth/callback"
 
-	t.Run("正常系: authorize が code を callback に返し token(pkce) が session に交換する", func(t *testing.T) {
+	t.Run("success: authorize returns a code to the callback and token(pkce) exchanges it for a session", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)
@@ -85,7 +85,7 @@ func TestOAuthRoundTrip(t *testing.T) {
 		}
 	})
 
-	t.Run("code は単回使用: 二度目の交換は invalid_grant", func(t *testing.T) {
+	t.Run("code is single-use: a second exchange is invalid_grant", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		f := handler.NewFactory(st, handlertest.NewTokens(st, nil))
 
@@ -112,7 +112,7 @@ func TestOAuthRoundTrip(t *testing.T) {
 		}
 	})
 
-	t.Run("login_hint で email を固定でき、再ログインは同一ユーザーに寄せる", func(t *testing.T) {
+	t.Run("login_hint fixes the email and a repeat sign-in reuses the same user", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		f := handler.NewFactory(st, handlertest.NewTokens(st, nil))
 
@@ -142,13 +142,13 @@ func TestOAuthRoundTrip(t *testing.T) {
 		}
 	})
 
-	t.Run("provider 欠落は 422、redirect_to 欠落は 422", func(t *testing.T) {
+	t.Run("missing provider is 422, missing redirect_to is 422", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		f := handler.NewFactory(st, handlertest.NewTokens(st, nil))
 
 		cases := []struct{ name, target string }{
-			{"provider欠落", "/auth/v1/authorize?redirect_to=" + url.QueryEscape(callback)},
-			{"redirect_to欠落", "/auth/v1/authorize?provider=github"},
+			{"missing provider", "/auth/v1/authorize?redirect_to=" + url.QueryEscape(callback)},
+			{"missing redirect_to", "/auth/v1/authorize?provider=github"},
 		}
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
@@ -161,7 +161,7 @@ func TestOAuthRoundTrip(t *testing.T) {
 		}
 	})
 
-	t.Run("未知の auth_code は invalid_grant、auth_code 欠落は invalid_request", func(t *testing.T) {
+	t.Run("unknown auth_code is invalid_grant, missing auth_code is invalid_request", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		f := handler.NewFactory(st, handlertest.NewTokens(st, nil))
 

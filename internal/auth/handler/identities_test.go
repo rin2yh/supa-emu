@@ -19,7 +19,7 @@ func TestLinkIdentityAuthorize(t *testing.T) {
 		"&code_challenge=abc123&code_challenge_method=s256" +
 		"&redirect_to=http%3A%2F%2F127.0.0.1%3A3000%2Fcallback&skip_http_redirect=true"
 
-	t.Run("正常系: skip_http_redirect=true は 200 で { url } を返す", func(t *testing.T) {
+	t.Run("success: skip_http_redirect=true returns 200 with { url }", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)
@@ -71,7 +71,7 @@ func TestLinkIdentityAuthorize(t *testing.T) {
 		}
 	})
 
-	t.Run("skip_http_redirect なしは 302 で Location を返す", func(t *testing.T) {
+	t.Run("without skip_http_redirect returns 302 with Location", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)
@@ -97,7 +97,7 @@ func TestLinkIdentityAuthorize(t *testing.T) {
 		}
 	})
 
-	t.Run("github 以外のプロバイダも同じローカル authorize に寄せる", func(t *testing.T) {
+	t.Run("a non-github provider also resolves to the same local authorize", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)
@@ -128,9 +128,9 @@ func TestLinkIdentityAuthorize(t *testing.T) {
 		}
 	})
 
-	t.Run("末尾スラッシュ付き issuer でも二重スラッシュにならない", func(t *testing.T) {
+	t.Run("a trailing-slash issuer does not produce a double slash", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
-		// Issuer with a trailing slash must not produce "…//authorize".
+		// Issuer with a trailing slash must not produce "...//authorize".
 		tk := handler.NewTokens(st, config.DefaultJWTSecret, handlertest.Issuer+"/", time.Hour, nil)
 		f := handler.NewFactory(st, tk)
 		seeded := handlertest.Seed(t, st, tk, "alice@example.com", "password123")
@@ -160,7 +160,7 @@ func TestLinkIdentityAuthorize(t *testing.T) {
 		}
 	})
 
-	t.Run("provider 欠落は 422 validation_failed", func(t *testing.T) {
+	t.Run("missing provider is 422 validation_failed", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)
@@ -179,7 +179,7 @@ func TestLinkIdentityAuthorize(t *testing.T) {
 		}
 	})
 
-	t.Run("認証失敗のエラーコード分類", func(t *testing.T) {
+	t.Run("auth failure error-code classification", func(t *testing.T) {
 		cases := []struct {
 			name          string
 			setHeader     func(r *http.Request, validToken string)
@@ -187,17 +187,17 @@ func TestLinkIdentityAuthorize(t *testing.T) {
 			wantErrorCode string
 		}{
 			{
-				name:          "Authorization 欠落は no_authorization",
+				name:          "missing Authorization is no_authorization",
 				setHeader:     func(*http.Request, string) {},
 				wantErrorCode: "no_authorization",
 			},
 			{
-				name:          "不正な署名の Bearer は bad_jwt",
+				name:          "a bad-signature Bearer is bad_jwt",
 				setHeader:     func(r *http.Request, _ string) { r.Header.Set("Authorization", "Bearer not-a-jwt") },
 				wantErrorCode: "bad_jwt",
 			},
 			{
-				name: "user が削除済みは session_not_found",
+				name: "a deleted user is session_not_found",
 				setHeader: func(r *http.Request, validToken string) {
 					r.Header.Set("Authorization", "Bearer "+validToken)
 				},
@@ -254,7 +254,7 @@ func TestUnlinkIdentity(t *testing.T) {
 		return ""
 	}
 
-	t.Run("正常系: seed した github identity を 204 で解除できる", func(t *testing.T) {
+	t.Run("success: a seeded github identity can be unlinked with 204", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)
@@ -285,7 +285,7 @@ func TestUnlinkIdentity(t *testing.T) {
 		}
 	})
 
-	t.Run("唯一の identity は解除不可: 422 single_identity_not_deletable", func(t *testing.T) {
+	t.Run("the only identity cannot be unlinked: 422 single_identity_not_deletable", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)
@@ -307,7 +307,7 @@ func TestUnlinkIdentity(t *testing.T) {
 		}
 	})
 
-	t.Run("未知の identity_id は 404 identity_not_found", func(t *testing.T) {
+	t.Run("an unknown identity_id is 404 identity_not_found", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)
@@ -327,7 +327,7 @@ func TestUnlinkIdentity(t *testing.T) {
 		}
 	})
 
-	t.Run("Authorization 欠落は 401 no_authorization", func(t *testing.T) {
+	t.Run("missing Authorization is 401 no_authorization", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)

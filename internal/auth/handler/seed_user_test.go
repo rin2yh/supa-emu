@@ -10,7 +10,7 @@ import (
 )
 
 func TestSeedUser(t *testing.T) {
-	t.Run("正常系: 201", func(t *testing.T) {
+	t.Run("success: 201", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		f := handler.NewFactory(st, handlertest.NewTokens(st, nil))
 
@@ -23,7 +23,7 @@ func TestSeedUser(t *testing.T) {
 		}
 	})
 
-	t.Run("identities で github identity を付与でき linked:true を検証できる", func(t *testing.T) {
+	t.Run("identities attaches a github identity so linked:true can be verified", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		f := handler.NewFactory(st, handlertest.NewTokens(st, nil))
 
@@ -66,7 +66,7 @@ func TestSeedUser(t *testing.T) {
 		}
 	})
 
-	t.Run("identity の provider 欠落は 400", func(t *testing.T) {
+	t.Run("a missing identity provider is 400", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		f := handler.NewFactory(st, handlertest.NewTokens(st, nil))
 
@@ -80,16 +80,16 @@ func TestSeedUser(t *testing.T) {
 		}
 	})
 
-	t.Run("バリデーション/重複", func(t *testing.T) {
+	t.Run("validation / duplicate", func(t *testing.T) {
 		cases := []struct {
 			name       string
 			seed       bool
 			body       map[string]string
 			wantStatus int
 		}{
-			{name: "email欠落で400", body: map[string]string{"password": "password123"}, wantStatus: http.StatusBadRequest},
-			{name: "password欠落で400", body: map[string]string{"email": "alice@example.com"}, wantStatus: http.StatusBadRequest},
-			{name: "既存emailで409", seed: true, body: map[string]string{"email": "alice@example.com", "password": "password123"}, wantStatus: http.StatusConflict},
+			{name: "missing email is 400", body: map[string]string{"password": "password123"}, wantStatus: http.StatusBadRequest},
+			{name: "missing password is 400", body: map[string]string{"email": "alice@example.com"}, wantStatus: http.StatusBadRequest},
+			{name: "existing email is 409", seed: true, body: map[string]string{"email": "alice@example.com", "password": "password123"}, wantStatus: http.StatusConflict},
 		}
 		for _, c := range cases {
 			t.Run(c.name, func(t *testing.T) {

@@ -7,7 +7,7 @@ import (
 )
 
 func TestAddIdentity(t *testing.T) {
-	t.Run("github identity を付与すると providers が更新される", func(t *testing.T) {
+	t.Run("adding a github identity updates providers", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		u, _ := s.CreateUser("alice@example.com", hash)
@@ -33,7 +33,7 @@ func TestAddIdentity(t *testing.T) {
 		}
 	})
 
-	t.Run("同一 provider の重複は ErrIdentityExists", func(t *testing.T) {
+	t.Run("a duplicate provider is ErrIdentityExists", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		u, _ := s.CreateUser("alice@example.com", hash)
@@ -45,7 +45,7 @@ func TestAddIdentity(t *testing.T) {
 		}
 	})
 
-	t.Run("存在しないユーザーは ErrUserNotFound", func(t *testing.T) {
+	t.Run("a nonexistent user is ErrUserNotFound", func(t *testing.T) {
 		s := newStore()
 		if _, err := s.AddIdentity("nope", "github", nil); !errors.Is(err, ErrUserNotFound) {
 			t.Errorf("want ErrUserNotFound, got %v", err)
@@ -54,7 +54,7 @@ func TestAddIdentity(t *testing.T) {
 }
 
 func TestRemoveIdentity(t *testing.T) {
-	t.Run("付与した github identity を identity_id で解除できる", func(t *testing.T) {
+	t.Run("an added github identity can be removed by identity_id", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		u, _ := s.CreateUser("alice@example.com", hash)
@@ -74,7 +74,7 @@ func TestRemoveIdentity(t *testing.T) {
 		}
 	})
 
-	t.Run("唯一の identity は ErrLastIdentity", func(t *testing.T) {
+	t.Run("the only identity is ErrLastIdentity", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		u, _ := s.CreateUser("alice@example.com", hash)
@@ -84,7 +84,7 @@ func TestRemoveIdentity(t *testing.T) {
 		}
 	})
 
-	t.Run("未知の identity_id は ErrIdentityNotFound", func(t *testing.T) {
+	t.Run("an unknown identity_id is ErrIdentityNotFound", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		u, _ := s.CreateUser("alice@example.com", hash)
@@ -96,7 +96,7 @@ func TestRemoveIdentity(t *testing.T) {
 }
 
 func TestOAuthUserAndAuthCode(t *testing.T) {
-	t.Run("CreateOAuthUser は provider identity 付きユーザーを作る", func(t *testing.T) {
+	t.Run("CreateOAuthUser creates a user with a provider identity", func(t *testing.T) {
 		s := newStore()
 		u, err := s.CreateOAuthUser("github", "")
 		if err != nil {
@@ -113,7 +113,7 @@ func TestOAuthUserAndAuthCode(t *testing.T) {
 		}
 	})
 
-	t.Run("login_hint(email) 指定は同一 email を再利用する", func(t *testing.T) {
+	t.Run("login_hint (email) reuses the same email", func(t *testing.T) {
 		s := newStore()
 		a, _ := s.CreateOAuthUser("github", "dev@example.com")
 		b, _ := s.CreateOAuthUser("github", "dev@example.com")
@@ -125,7 +125,7 @@ func TestOAuthUserAndAuthCode(t *testing.T) {
 		}
 	})
 
-	t.Run("auth code は単回使用でユーザーに交換される", func(t *testing.T) {
+	t.Run("an auth code is single-use and exchanges to its user", func(t *testing.T) {
 		s := newStore()
 		u, _ := s.CreateOAuthUser("github", "")
 		ac, err := s.CreateAuthCode(u.ID)
@@ -144,7 +144,7 @@ func TestOAuthUserAndAuthCode(t *testing.T) {
 		}
 	})
 
-	t.Run("期限切れ auth code は ErrAuthCodeNotFound", func(t *testing.T) {
+	t.Run("an expired auth code is ErrAuthCodeNotFound", func(t *testing.T) {
 		now := time.Date(2026, 5, 23, 0, 0, 0, 0, time.UTC)
 		s := New(Config{Clock: func() time.Time { return now }, ReuseInterval: 10 * time.Second})
 		u, _ := s.CreateOAuthUser("github", "")
