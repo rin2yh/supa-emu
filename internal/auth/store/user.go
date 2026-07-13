@@ -31,6 +31,7 @@ func (s *Store) CreateUser(email string, passwordHash []byte) (*User, error) {
 		AppMetadata:      map[string]any{"provider": "email", "providers": []string{"email"}},
 		UserMetadata:     map[string]any{},
 		Identities: []Identity{{
+			IdentityID:   uuid.NewString(),
 			ID:           id,
 			UserID:       id,
 			Provider:     "email",

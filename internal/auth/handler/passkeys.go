@@ -214,6 +214,12 @@ type passkeyListItem struct {
 // auth.passkey.list() uses xform: (data) => ({ data }), handing the raw array
 // back to the caller as PasskeyListItem[], so wrapping it under a key would make
 // the client see no passkeys.
+// PasskeyList returns the caller's own passkeys (GET /auth/v1/passkeys,
+// supabase-js passkey.list). Requires a Bearer token (user-scoped, no
+// service_role). The body is a top-level JSON array because supabase-js's
+// xform: (data) => ({ data }) hands the array straight back as
+// PasskeyListItem[]; last_used_at is null until the passkey's first successful
+// authentication.
 func PasskeyList(c *Context) {
 	u, _, ok := requireUser(c)
 	if !ok {
@@ -237,6 +243,12 @@ func PasskeyList(c *Context) {
 // by registration/verify and listed by PasskeyList, not the credential id.
 // Requires a Bearer token; a passkey that does not exist or belongs to another
 // user yields 404, mirroring the factors unenroll contract.
+// PasskeyDelete removes one of the caller's own passkeys
+// (DELETE /auth/v1/passkeys/{id}, supabase-js passkey.unenroll). Requires a
+// Bearer token. The {id} is the passkey record id (from registration/verify),
+// not the credential id; a passkey that does not exist or belongs to another
+// user returns 404 passkey_not_found (indistinguishable, so a caller cannot
+// probe others' passkeys).
 func PasskeyDelete(c *Context) {
 	u, _, ok := requireUser(c)
 	if !ok {

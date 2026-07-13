@@ -17,12 +17,18 @@ type refreshGrantRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
+// Token is the /auth/v1/token dispatcher, keyed on grant_type:
+//   - password       signInWithPassword (email + password)
+//   - refresh_token  refreshSession (rotating refresh tokens)
+//   - pkce           exchangeCodeForSession (OAuth code exchange; see oauth.go)
 func Token(c *Context) {
 	switch c.Query("grant_type") {
 	case "password":
 		tokenPassword(c)
 	case "refresh_token":
 		tokenRefresh(c)
+	case "pkce":
+		tokenPKCE(c)
 	default:
 		c.OAuth(http.StatusBadRequest, "unsupported_grant_type", "grant_type is required")
 	}
