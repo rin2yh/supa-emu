@@ -2,6 +2,7 @@ package store
 
 import (
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -18,6 +19,27 @@ var (
 	ErrLastIdentity = errors.New("store: cannot unlink the last identity")
 )
 
+// newIdentity builds a provider identity, stamping the row id (identity_id), the
+// three matching timestamps, and defaulting a nil data map. It is the single
+// place the Identity shape is assembled, shared by CreateUser (email identity),
+// AddIdentity (seed), and appendProviderIdentityLocked (OAuth) so a new field is
+// added once. Callers own the returned struct's data map; it is not cloned here.
+func newIdentity(userID, provider, providerID string, data map[string]any, now time.Time) Identity {
+	if data == nil {
+		data = map[string]any{}
+	}
+	return Identity{
+		IdentityID:   uuid.NewString(),
+		ID:           providerID,
+		UserID:       userID,
+		Provider:     provider,
+		IdentityData: data,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+		LastSignInAt: now,
+	}
+}
+
 // AddIdentity attaches a new provider identity to an existing user and returns
 // the updated user clone. A second identity for the same provider yields
 // ErrIdentityExists; a missing user yields ErrUserNotFound. The identity_data is
@@ -30,10 +52,8 @@ func (s *Store) AddIdentity(userID, provider string, identityData map[string]any
 	if !ok {
 		return nil, ErrUserNotFound
 	}
-	for _, id := range u.Identities {
-		if id.Provider == provider {
-			return nil, ErrIdentityExists
-		}
+	if hasProviderLocked(u, provider) {
+		return nil, ErrIdentityExists
 	}
 	now := s.clock()
 	data := cloneAnyMap(identityData)
@@ -47,16 +67,7 @@ func (s *Store) AddIdentity(userID, provider string, identityData map[string]any
 		providerID = userID
 		data["sub"] = providerID
 	}
-	u.Identities = append(u.Identities, Identity{
-		IdentityID:   uuid.NewString(),
-		ID:           providerID,
-		UserID:       userID,
-		Provider:     provider,
-		IdentityData: data,
-		CreatedAt:    now,
-		UpdatedAt:    now,
-		LastSignInAt: now,
-	})
+	u.Identities = append(u.Identities, newIdentity(userID, provider, providerID, data, now))
 	recomputeProvidersLocked(u)
 	u.UpdatedAt = now
 	return s.cloneUser(u), nil

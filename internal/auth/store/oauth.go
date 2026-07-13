@@ -47,31 +47,14 @@ func (s *Store) CreateOAuthUser(provider, email string) (*User, error) {
 		}
 	}
 
-	id := uuid.NewString()
 	if email == "" {
-		// Synthesize a stable, unique address from the fresh user id so anonymous
-		// OAuth flows never collide on the email index.
-		email = provider + "_" + id + "@oauth.supa-emu.test"
+		// Synthesize a unique address so anonymous OAuth flows never collide on
+		// the email index.
+		email = provider + "_" + uuid.NewString() + "@oauth.supa-emu.test"
 	}
-	confirmed := now
-	u := &User{
-		ID:               id,
-		Email:            email,
-		Aud:              "authenticated",
-		Role:             "authenticated",
-		EmailConfirmedAt: &confirmed,
-		ConfirmedAt:      &confirmed,
-		AppMetadata:      map[string]any{},
-		UserMetadata:     map[string]any{},
-		Identities:       []Identity{},
-		CreatedAt:        now,
-		UpdatedAt:        now,
-		LastSignInAt:     &now,
-	}
+	u := s.newUserLocked(email, now)
 	appendProviderIdentityLocked(u, provider, email, now)
 	recomputeProvidersLocked(u)
-	s.users[id] = u
-	s.emailIndex[email] = id
 	return s.cloneUser(u), nil
 }
 
@@ -90,26 +73,15 @@ func hasProviderLocked(u *User, provider string) bool {
 func appendProviderIdentityLocked(u *User, provider, email string, now time.Time) {
 	sub := uuid.NewString()
 	data := map[string]any{"sub": sub, "email": email}
-	if local := email; local != "" {
-		if at := strings.IndexByte(local, '@'); at > 0 {
-			data["user_name"] = local[:at]
-		}
+	if at := strings.IndexByte(email, '@'); at > 0 {
+		data["user_name"] = email[:at]
 	}
-	u.Identities = append(u.Identities, Identity{
-		IdentityID:   uuid.NewString(),
-		ID:           sub,
-		UserID:       u.ID,
-		Provider:     provider,
-		IdentityData: data,
-		CreatedAt:    now,
-		UpdatedAt:    now,
-		LastSignInAt: now,
-	})
+	u.Identities = append(u.Identities, newIdentity(u.ID, provider, sub, data, now))
 }
 
-// CreateAuthCode mints a single-use authorization code bound to the user and
-// provider. The code is exchanged by the pkce token grant.
-func (s *Store) CreateAuthCode(userID, provider, codeChallenge string) (*AuthCode, error) {
+// CreateAuthCode mints a single-use authorization code bound to the user. The
+// code is exchanged by the pkce token grant.
+func (s *Store) CreateAuthCode(userID string) (*AuthCode, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, ok := s.users[userID]; !ok {
@@ -117,12 +89,9 @@ func (s *Store) CreateAuthCode(userID, provider, codeChallenge string) (*AuthCod
 	}
 	now := s.clock()
 	ac := &AuthCode{
-		Code:          uuid.NewString(),
-		UserID:        userID,
-		Provider:      provider,
-		CodeChallenge: codeChallenge,
-		CreatedAt:     now,
-		ExpiresAt:     now.Add(authCodeTTL),
+		Code:      uuid.NewString(),
+		UserID:    userID,
+		ExpiresAt: now.Add(authCodeTTL),
 	}
 	s.authCodes[ac.Code] = ac
 	clone := *ac
@@ -130,25 +99,21 @@ func (s *Store) CreateAuthCode(userID, provider, codeChallenge string) (*AuthCod
 }
 
 // ConsumeAuthCode validates and single-use consumes an authorization code,
-// returning it alongside the associated user clone. An unknown / expired code
-// yields ErrAuthCodeNotFound; a code whose user has since been deleted yields
-// ErrUserNotFound.
-func (s *Store) ConsumeAuthCode(code string) (*AuthCode, *User, error) {
+// returning it (its UserID identifies the account to sign in). An unknown /
+// expired / already-consumed code yields ErrAuthCodeNotFound. The caller stamps
+// the sign-in and issues the session, so the user is not resolved here.
+func (s *Store) ConsumeAuthCode(code string) (*AuthCode, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	ac, ok := s.authCodes[code]
 	if !ok {
-		return nil, nil, ErrAuthCodeNotFound
+		return nil, ErrAuthCodeNotFound
 	}
 	if s.clock().After(ac.ExpiresAt) {
 		delete(s.authCodes, code)
-		return nil, nil, ErrAuthCodeNotFound
+		return nil, ErrAuthCodeNotFound
 	}
 	delete(s.authCodes, code)
-	u, ok := s.users[ac.UserID]
-	if !ok {
-		return nil, nil, ErrUserNotFound
-	}
 	clone := *ac
-	return &clone, s.cloneUser(u), nil
+	return &clone, nil
 }

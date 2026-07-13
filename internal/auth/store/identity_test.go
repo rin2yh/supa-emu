@@ -128,18 +128,18 @@ func TestOAuthUserAndAuthCode(t *testing.T) {
 	t.Run("auth code は単回使用でユーザーに交換される", func(t *testing.T) {
 		s := newStore()
 		u, _ := s.CreateOAuthUser("github", "")
-		ac, err := s.CreateAuthCode(u.ID, "github", "challenge")
+		ac, err := s.CreateAuthCode(u.ID)
 		if err != nil {
 			t.Fatalf("CreateAuthCode: %v", err)
 		}
-		got, gotUser, err := s.ConsumeAuthCode(ac.Code)
+		got, err := s.ConsumeAuthCode(ac.Code)
 		if err != nil {
 			t.Fatalf("ConsumeAuthCode: %v", err)
 		}
-		if got.UserID != u.ID || gotUser.ID != u.ID {
-			t.Errorf("mismatch: code.UserID=%s user.ID=%s want=%s", got.UserID, gotUser.ID, u.ID)
+		if got.UserID != u.ID {
+			t.Errorf("mismatch: code.UserID=%s want=%s", got.UserID, u.ID)
 		}
-		if _, _, err := s.ConsumeAuthCode(ac.Code); !errors.Is(err, ErrAuthCodeNotFound) {
+		if _, err := s.ConsumeAuthCode(ac.Code); !errors.Is(err, ErrAuthCodeNotFound) {
 			t.Errorf("second consume want ErrAuthCodeNotFound, got %v", err)
 		}
 	})
@@ -148,9 +148,9 @@ func TestOAuthUserAndAuthCode(t *testing.T) {
 		now := time.Date(2026, 5, 23, 0, 0, 0, 0, time.UTC)
 		s := New(Config{Clock: func() time.Time { return now }, ReuseInterval: 10 * time.Second})
 		u, _ := s.CreateOAuthUser("github", "")
-		ac, _ := s.CreateAuthCode(u.ID, "github", "")
+		ac, _ := s.CreateAuthCode(u.ID)
 		now = now.Add(authCodeTTL + time.Second)
-		if _, _, err := s.ConsumeAuthCode(ac.Code); !errors.Is(err, ErrAuthCodeNotFound) {
+		if _, err := s.ConsumeAuthCode(ac.Code); !errors.Is(err, ErrAuthCodeNotFound) {
 			t.Errorf("want ErrAuthCodeNotFound, got %v", err)
 		}
 	})

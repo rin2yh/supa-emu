@@ -42,14 +42,12 @@ type Identity struct {
 // AuthCode is a single-use OAuth authorization code minted by GET
 // /auth/v1/authorize and exchanged by POST /auth/v1/token?grant_type=pkce
 // (supabase-js exchangeCodeForSession). The emulator does not verify PKCE, so
-// CodeChallenge is retained only for parity and never checked against a verifier.
+// the code carries only what the exchange needs: the user to sign in and an
+// expiry bounding the exchange window.
 type AuthCode struct {
-	Code          string
-	UserID        string
-	Provider      string
-	CodeChallenge string
-	CreatedAt     time.Time
-	ExpiresAt     time.Time
+	Code      string
+	UserID    string
+	ExpiresAt time.Time
 }
 
 type RefreshToken struct {

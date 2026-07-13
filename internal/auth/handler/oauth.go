@@ -1,12 +1,9 @@
 package handler
 
 import (
-	"errors"
 	"net/http"
 	"net/url"
 	"strings"
-
-	"github.com/rin2yh/supa-emu/internal/auth/store"
 )
 
 // OAuth sign-in round trip, emulated end to end inside the process so an
@@ -55,7 +52,7 @@ func Authorize(c *Context) {
 		c.Error(http.StatusInternalServerError, err.Error())
 		return
 	}
-	ac, err := c.store.CreateAuthCode(u.ID, provider, c.Query("code_challenge"))
+	ac, err := c.store.CreateAuthCode(u.ID)
 	if err != nil {
 		c.Error(http.StatusInternalServerError, err.Error())
 		return
@@ -89,17 +86,16 @@ func tokenPKCE(c *Context) {
 		return
 	}
 
-	_, u, err := c.store.ConsumeAuthCode(req.AuthCode)
+	ac, err := c.store.ConsumeAuthCode(req.AuthCode)
 	if err != nil {
-		// A missing/expired code and a code whose user is gone both collapse to the
-		// same client-visible failure: the flow can no longer be completed.
 		c.OAuth(http.StatusBadRequest, "invalid_grant", "invalid flow state, no valid flow state found")
 		return
 	}
 
-	// Stamp last_sign_in_at like a password/passkey login; a concurrent DeleteUser
-	// would make this fail, which we treat as an unusable flow.
-	fresh, ok := c.store.UpdateLastSignIn(u.ID)
+	// Stamp last_sign_in_at like a password/passkey login. A code whose user has
+	// since been deleted makes this fail, collapsing to the same client-visible
+	// "flow can no longer be completed" as a missing code.
+	fresh, ok := c.store.UpdateLastSignIn(ac.UserID)
 	if !ok {
 		c.OAuth(http.StatusBadRequest, "invalid_grant", "invalid flow state, no valid flow state found")
 		return
@@ -107,10 +103,6 @@ func tokenPKCE(c *Context) {
 
 	tr, err := c.tokens.IssueWithMethod(fresh, "oauth")
 	if err != nil {
-		if errors.Is(err, store.ErrUserNotFound) {
-			c.OAuth(http.StatusBadRequest, "invalid_grant", "invalid flow state, no valid flow state found")
-			return
-		}
 		c.Error(http.StatusInternalServerError, err.Error())
 		return
 	}
