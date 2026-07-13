@@ -11,7 +11,7 @@ import (
 )
 
 func TestSnapshot(t *testing.T) {
-	t.Run("空ストアで snake_case の空配列を返す", func(t *testing.T) {
+	t.Run("returns empty snake_case arrays for an empty store", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		f := handler.NewFactory(st, handlertest.NewTokens(st, nil))
 

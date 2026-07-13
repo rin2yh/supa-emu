@@ -14,7 +14,7 @@ import (
 )
 
 func TestSmoke(t *testing.T) {
-	t.Run("バイナリ起動後にhealthエンドポイントが応答する", func(t *testing.T) {
+	t.Run("health endpoint responds after the binary starts", func(t *testing.T) {
 		port, err := freePort()
 		if err != nil {
 			t.Fatalf("freePort: %v", err)
@@ -53,7 +53,7 @@ func TestSmoke(t *testing.T) {
 
 		// middleware 配線 drift を検知するため、複数経路の応答形式を確認する。
 		// health: 通常応答、settings: 別 handler、unknown: 404 catch-all、user: error_code 経路。
-		t.Run("/auth/v1/health は GoTrue name を返す", func(t *testing.T) {
+		t.Run("/auth/v1/health returns the GoTrue name", func(t *testing.T) {
 			resp, err := http.Get(base + "/auth/v1/health")
 			if err != nil {
 				t.Fatalf("Get: %v", err)
@@ -71,7 +71,7 @@ func TestSmoke(t *testing.T) {
 			}
 		})
 
-		t.Run("/auth/v1/user は X-Supabase-Api-Version 付き 401 を返す", func(t *testing.T) {
+		t.Run("/auth/v1/user returns 401 with X-Supabase-Api-Version", func(t *testing.T) {
 			resp, err := http.Get(base + "/auth/v1/user")
 			if err != nil {
 				t.Fatalf("Get: %v", err)
@@ -85,7 +85,7 @@ func TestSmoke(t *testing.T) {
 			}
 		})
 
-		t.Run("未知 path は JSON 404 を返す（catch-all）", func(t *testing.T) {
+		t.Run("unknown path returns a JSON 404 (catch-all)", func(t *testing.T) {
 			resp, err := http.Get(base + "/auth/v1/unknown")
 			if err != nil {
 				t.Fatalf("Get: %v", err)

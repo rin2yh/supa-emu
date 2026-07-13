@@ -10,7 +10,7 @@ import (
 )
 
 func TestAdminDeleteUser(t *testing.T) {
-	t.Run("有効なIDで200を返す", func(t *testing.T) {
+	t.Run("returns 200 with a valid ID", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)
@@ -27,14 +27,14 @@ func TestAdminDeleteUser(t *testing.T) {
 		}
 	})
 
-	t.Run("ID 解決失敗系", func(t *testing.T) {
+	t.Run("ID resolution failures", func(t *testing.T) {
 		cases := []struct {
 			name       string
 			id         string
 			wantStatus int
 		}{
-			{name: "存在しないID", id: "nonexistent", wantStatus: http.StatusNotFound},
-			{name: "空ID", id: "", wantStatus: http.StatusBadRequest},
+			{name: "nonexistent ID", id: "nonexistent", wantStatus: http.StatusNotFound},
+			{name: "empty ID", id: "", wantStatus: http.StatusBadRequest},
 		}
 		for _, c := range cases {
 			t.Run(c.name, func(t *testing.T) {

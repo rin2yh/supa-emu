@@ -11,13 +11,13 @@ import (
 )
 
 func TestLogout(t *testing.T) {
-	t.Run("冪等（GoTrue 互換で常に204）", func(t *testing.T) {
+	t.Run("idempotent (always 204 for GoTrue compatibility)", func(t *testing.T) {
 		cases := []struct {
 			name      string
 			setHeader func(r *http.Request)
 		}{
-			{name: "Authorization 無し", setHeader: func(*http.Request) {}},
-			{name: "不正な Bearer", setHeader: func(r *http.Request) { r.Header.Set("Authorization", "Bearer bogus") }},
+			{name: "no Authorization", setHeader: func(*http.Request) {}},
+			{name: "invalid Bearer", setHeader: func(r *http.Request) { r.Header.Set("Authorization", "Bearer bogus") }},
 		}
 		for _, c := range cases {
 			t.Run(c.name, func(t *testing.T) {
@@ -35,7 +35,7 @@ func TestLogout(t *testing.T) {
 		}
 	})
 
-	t.Run("有効な Bearer で 204 + refresh_token 失効", func(t *testing.T) {
+	t.Run("valid Bearer returns 204 + revokes refresh_token", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)
@@ -58,7 +58,7 @@ func TestLogout(t *testing.T) {
 		}
 	})
 
-	t.Run("期限切れ access_token でも refresh_token は revoke される", func(t *testing.T) {
+	t.Run("refresh_token is revoked even with an expired access_token", func(t *testing.T) {
 		current := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 		clock := func() time.Time { return current }
 		st := handlertest.NewStore(clock)
