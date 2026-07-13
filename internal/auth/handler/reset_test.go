@@ -10,7 +10,7 @@ import (
 )
 
 func TestReset(t *testing.T) {
-	t.Run("204 を返し Store が空になる", func(t *testing.T) {
+	t.Run("returns 204 and empties the Store", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)

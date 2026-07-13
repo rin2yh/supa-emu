@@ -11,7 +11,7 @@ import (
 )
 
 func TestAdminListUsers(t *testing.T) {
-	t.Run("ページネーションヘッダ", func(t *testing.T) {
+	t.Run("pagination headers", func(t *testing.T) {
 		cases := []struct {
 			name        string
 			seedEmails  []string
@@ -21,14 +21,14 @@ func TestAdminListUsers(t *testing.T) {
 			mustExclude []string
 		}{
 			{
-				name:        "1ページ目で next/last が両方付く",
+				name:        "page 1 includes both next and last",
 				seedEmails:  []string{"a@example.com", "b@example.com", "c@example.com"},
 				query:       "page=1&per_page=2",
 				wantTotal:   "3",
 				mustContain: []string{`rel="next"`, `rel="last"`},
 			},
 			{
-				name:        "単一ページでも rel=\"last\" は必ず出る",
+				name:        "rel=\"last\" is always present even on a single page",
 				seedEmails:  []string{"alice@example.com"},
 				query:       "page=1&per_page=50",
 				wantTotal:   "1",
@@ -66,7 +66,7 @@ func TestAdminListUsers(t *testing.T) {
 		}
 	})
 
-	t.Run("空ストアでも users:[] が返る", func(t *testing.T) {
+	t.Run("returns users:[] even for an empty store", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		f := handler.NewFactory(st, handlertest.NewTokens(st, nil))
 

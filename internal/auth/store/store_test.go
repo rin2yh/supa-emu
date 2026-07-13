@@ -15,7 +15,7 @@ func newStore() *Store {
 }
 
 func TestCreateUser(t *testing.T) {
-	t.Run("新規ユーザーがIDとともに登録される", func(t *testing.T) {
+	t.Run("a new user is registered with an ID", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		u, err := s.CreateUser("alice@example.com", hash)
@@ -30,7 +30,7 @@ func TestCreateUser(t *testing.T) {
 		}
 	})
 
-	t.Run("同じemailで2回作るとErrUserAlreadyExists", func(t *testing.T) {
+	t.Run("creating twice with the same email returns ErrUserAlreadyExists", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		_, _ = s.CreateUser("alice@example.com", hash)
@@ -40,7 +40,7 @@ func TestCreateUser(t *testing.T) {
 		}
 	})
 
-	t.Run("emailを大文字小文字無視して重複検知し、lowercaseで保存する", func(t *testing.T) {
+	t.Run("detects duplicates case-insensitively and stores email in lowercase", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		u, _ := s.CreateUser("Alice@Example.COM", hash)
@@ -55,7 +55,7 @@ func TestCreateUser(t *testing.T) {
 }
 
 func TestFindUser(t *testing.T) {
-	t.Run("emailの大文字小文字を無視して検索できる", func(t *testing.T) {
+	t.Run("finds email case-insensitively", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		created, _ := s.CreateUser("alice@example.com", hash)
@@ -65,7 +65,7 @@ func TestFindUser(t *testing.T) {
 		}
 	})
 
-	t.Run("存在しないIDはfalseを返す", func(t *testing.T) {
+	t.Run("nonexistent ID returns false", func(t *testing.T) {
 		s := newStore()
 		if _, ok := s.FindUserByID("nope"); ok {
 			t.Error("should not be found")
@@ -74,7 +74,7 @@ func TestFindUser(t *testing.T) {
 }
 
 func TestDeleteUser(t *testing.T) {
-	t.Run("削除で関連session/refresh_tokenも消える", func(t *testing.T) {
+	t.Run("deletion also removes related session/refresh_token", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		u, _ := s.CreateUser("alice@example.com", hash)
@@ -92,7 +92,7 @@ func TestDeleteUser(t *testing.T) {
 		}
 	})
 
-	t.Run("存在しないIDはErrUserNotFound", func(t *testing.T) {
+	t.Run("nonexistent ID returns ErrUserNotFound", func(t *testing.T) {
 		s := newStore()
 		if err := s.DeleteUser("nonexistent"); !errors.Is(err, ErrUserNotFound) {
 			t.Fatalf("expected ErrUserNotFound, got %v", err)
@@ -101,7 +101,7 @@ func TestDeleteUser(t *testing.T) {
 }
 
 func TestSetUserMetadata(t *testing.T) {
-	t.Run("Storeに永続化され、後続のFindで取得できる", func(t *testing.T) {
+	t.Run("persists to the Store and is retrievable by a later Find", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		u, _ := s.CreateUser("alice@example.com", hash)
@@ -116,7 +116,7 @@ func TestSetUserMetadata(t *testing.T) {
 }
 
 func TestListUsers(t *testing.T) {
-	t.Run("CreatedAt昇順でページ単位に返り、totalは全件数", func(t *testing.T) {
+	t.Run("returns pages in CreatedAt ascending order, with total as the full count", func(t *testing.T) {
 		base := time.Date(2026, 5, 23, 0, 0, 0, 0, time.UTC)
 		tick := 0
 		s := New(Config{Clock: func() time.Time {
@@ -144,7 +144,7 @@ func TestListUsers(t *testing.T) {
 		}
 	})
 
-	t.Run("offsetが件数を超えても非nilの空スライスを返す", func(t *testing.T) {
+	t.Run("returns a non-nil empty slice even when offset exceeds the count", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		_, _ = s.CreateUser("a@example.com", hash)
@@ -158,7 +158,7 @@ func TestListUsers(t *testing.T) {
 		}
 	})
 
-	t.Run("負のoffset(page由来のオーバーフロー)でもpanicせず空スライス", func(t *testing.T) {
+	t.Run("returns an empty slice without panicking even for a negative offset (page-derived overflow)", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		_, _ = s.CreateUser("a@example.com", hash)
@@ -174,7 +174,7 @@ func TestListUsers(t *testing.T) {
 }
 
 func TestRefreshTokenRotation(t *testing.T) {
-	t.Run("Consumeで新tokenを発行し旧tokenを失効させる", func(t *testing.T) {
+	t.Run("Consume issues a new token and revokes the old one", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		u, _ := s.CreateUser("alice@example.com", hash)
@@ -193,7 +193,7 @@ func TestRefreshTokenRotation(t *testing.T) {
 		}
 	})
 
-	t.Run("reuse_interval内なら旧tokenの再利用で同じ子tokenが返る", func(t *testing.T) {
+	t.Run("within reuse_interval, reusing the old token returns the same child token", func(t *testing.T) {
 		now := time.Date(2026, 5, 23, 0, 0, 0, 0, time.UTC)
 		s := New(Config{Clock: func() time.Time { return now }, ReuseInterval: 10 * time.Second})
 		hash, _ := HashPassword("password123")
@@ -211,7 +211,7 @@ func TestRefreshTokenRotation(t *testing.T) {
 		}
 	})
 
-	t.Run("reuse_interval超過後は旧tokenがinvalidになる", func(t *testing.T) {
+	t.Run("after reuse_interval elapses, the old token becomes invalid", func(t *testing.T) {
 		now := time.Date(2026, 5, 23, 0, 0, 0, 0, time.UTC)
 		s := New(Config{Clock: func() time.Time { return now }, ReuseInterval: 10 * time.Second})
 		hash, _ := HashPassword("password123")
@@ -227,7 +227,7 @@ func TestRefreshTokenRotation(t *testing.T) {
 		}
 	})
 
-	t.Run("T0→T1→T2 とローテートされても、T0 reuse で末端 T2 を返す", func(t *testing.T) {
+	t.Run("even after rotating T0->T1->T2, reusing T0 returns the terminal T2", func(t *testing.T) {
 		now := time.Date(2026, 5, 23, 0, 0, 0, 0, time.UTC)
 		s := New(Config{Clock: func() time.Time { return now }, ReuseInterval: time.Minute})
 		hash, _ := HashPassword("password123")
@@ -247,7 +247,7 @@ func TestRefreshTokenRotation(t *testing.T) {
 		}
 	})
 
-	t.Run("RevokeRefreshTokensBySessionでreuse_intervalが2hでも再利用不可", func(t *testing.T) {
+	t.Run("RevokeRefreshTokensBySession prevents reuse even with a 2h reuse_interval", func(t *testing.T) {
 		now := time.Date(2026, 5, 23, 0, 0, 0, 0, time.UTC)
 		s := New(Config{Clock: func() time.Time { return now }, ReuseInterval: 2 * time.Hour})
 		hash, _ := HashPassword("password123")
@@ -263,7 +263,7 @@ func TestRefreshTokenRotation(t *testing.T) {
 }
 
 func TestSnapshotAndReset(t *testing.T) {
-	t.Run("空ストアで空配列が返る（JSONでnullにならない）", func(t *testing.T) {
+	t.Run("an empty store returns an empty array (not null in JSON)", func(t *testing.T) {
 		s := newStore()
 		snap := s.Snapshot()
 		if snap.Users == nil || snap.Sessions == nil || snap.RefreshTokens == nil {
@@ -271,7 +271,7 @@ func TestSnapshotAndReset(t *testing.T) {
 		}
 	})
 
-	t.Run("Resetで全データが消える", func(t *testing.T) {
+	t.Run("Reset clears all data", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		u, _ := s.CreateUser("alice@example.com", hash)
@@ -288,7 +288,7 @@ func TestSnapshotAndReset(t *testing.T) {
 }
 
 func TestCloneIsDeep(t *testing.T) {
-	t.Run("clone のmetadata書き換えがStore本体に影響しない", func(t *testing.T) {
+	t.Run("mutating a clone's metadata does not affect the Store itself", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		created, _ := s.CreateUser("alice@example.com", hash)
@@ -311,7 +311,7 @@ func TestCloneIsDeep(t *testing.T) {
 }
 
 func TestCloneIsDeep_NestedSliceInAppMetadata(t *testing.T) {
-	t.Run("AppMetadata['providers'] の []string を書き換えても Store 本体は影響を受けない", func(t *testing.T) {
+	t.Run("mutating the []string in AppMetadata['providers'] does not affect the Store itself", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		created, _ := s.CreateUser("alice@example.com", hash)
@@ -331,7 +331,7 @@ func TestCloneIsDeep_NestedSliceInAppMetadata(t *testing.T) {
 }
 
 func TestIssueSession_Atomic(t *testing.T) {
-	t.Run("削除済みユーザに対しては ErrUserNotFound を返し、session も残らない", func(t *testing.T) {
+	t.Run("returns ErrUserNotFound for a deleted user and leaves no session behind", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		u, _ := s.CreateUser("alice@example.com", hash)
@@ -350,7 +350,7 @@ func TestIssueSession_Atomic(t *testing.T) {
 }
 
 func TestRevokeRefreshTokensBySession_CleansParentToChild(t *testing.T) {
-	t.Run("logout 後に同じ session の parentToChild エントリが残らない", func(t *testing.T) {
+	t.Run("no parentToChild entry for the same session remains after logout", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		u, _ := s.CreateUser("alice@example.com", hash)
@@ -371,7 +371,7 @@ func TestRevokeRefreshTokensBySession_CleansParentToChild(t *testing.T) {
 }
 
 func TestDeleteUser_CleansParentToChild(t *testing.T) {
-	t.Run("ユーザ削除時に parentToChild の両エッジが掃除される", func(t *testing.T) {
+	t.Run("both parentToChild edges are cleaned up when a user is deleted", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		u, _ := s.CreateUser("alice@example.com", hash)
@@ -388,7 +388,7 @@ func TestDeleteUser_CleansParentToChild(t *testing.T) {
 }
 
 func TestRace(t *testing.T) {
-	t.Run("並行書き込みで競合しない", func(t *testing.T) {
+	t.Run("concurrent writes do not race", func(t *testing.T) {
 		s := newStore()
 		hash, _ := HashPassword("password123")
 		var wg sync.WaitGroup

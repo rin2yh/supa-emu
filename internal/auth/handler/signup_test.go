@@ -11,8 +11,8 @@ import (
 )
 
 func TestSignup(t *testing.T) {
-	t.Run("正常系", func(t *testing.T) {
-		t.Run("200 と access_token / refresh_token / user を返す", func(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		t.Run("returns 200 with access_token / refresh_token / user", func(t *testing.T) {
 			st := handlertest.NewStore(nil)
 			f := handler.NewFactory(st, handlertest.NewTokens(st, nil))
 
@@ -34,7 +34,7 @@ func TestSignup(t *testing.T) {
 			}
 		})
 
-		t.Run("data フィールドが Store に永続化される", func(t *testing.T) {
+		t.Run("persists the data field to the Store", func(t *testing.T) {
 			st := handlertest.NewStore(nil)
 			f := handler.NewFactory(st, handlertest.NewTokens(st, nil))
 
@@ -55,7 +55,7 @@ func TestSignup(t *testing.T) {
 			}
 		})
 
-		t.Run("email は lowercase 正規化して保存される", func(t *testing.T) {
+		t.Run("stores email normalized to lowercase", func(t *testing.T) {
 			st := handlertest.NewStore(nil)
 			f := handler.NewFactory(st, handlertest.NewTokens(st, nil))
 
@@ -75,17 +75,17 @@ func TestSignup(t *testing.T) {
 		})
 	})
 
-	t.Run("バリデーション失敗", func(t *testing.T) {
+	t.Run("validation failure", func(t *testing.T) {
 		cases := []struct {
 			name       string
 			body       map[string]string
 			wantStatus int
 			wantMsg    string
 		}{
-			{name: "email欠落で400", body: map[string]string{"password": "password123"}, wantStatus: http.StatusBadRequest, wantMsg: "required"},
-			{name: "password欠落で400", body: map[string]string{"email": "alice@example.com"}, wantStatus: http.StatusBadRequest, wantMsg: "required"},
-			{name: "@を含まないemailで400", body: map[string]string{"email": "no-at-sign", "password": "password123"}, wantStatus: http.StatusBadRequest, wantMsg: "invalid format"},
-			{name: "5文字以下のpasswordで422", body: map[string]string{"email": "alice@example.com", "password": "abc"}, wantStatus: http.StatusUnprocessableEntity, wantMsg: "at least 6 characters"},
+			{name: "missing email returns 400", body: map[string]string{"password": "password123"}, wantStatus: http.StatusBadRequest, wantMsg: "required"},
+			{name: "missing password returns 400", body: map[string]string{"email": "alice@example.com"}, wantStatus: http.StatusBadRequest, wantMsg: "required"},
+			{name: "email without @ returns 400", body: map[string]string{"email": "no-at-sign", "password": "password123"}, wantStatus: http.StatusBadRequest, wantMsg: "invalid format"},
+			{name: "password of 5 chars or fewer returns 422", body: map[string]string{"email": "alice@example.com", "password": "abc"}, wantStatus: http.StatusUnprocessableEntity, wantMsg: "at least 6 characters"},
 		}
 		for _, c := range cases {
 			t.Run(c.name, func(t *testing.T) {
@@ -105,8 +105,8 @@ func TestSignup(t *testing.T) {
 		}
 	})
 
-	t.Run("既存email", func(t *testing.T) {
-		t.Run("422 + 'already registered' を返す（アプリ層 isUserAlreadyExistsError 互換）", func(t *testing.T) {
+	t.Run("existing email", func(t *testing.T) {
+		t.Run("returns 422 + 'already registered' (app-layer isUserAlreadyExistsError compatible)", func(t *testing.T) {
 			st := handlertest.NewStore(nil)
 			f := handler.NewFactory(st, handlertest.NewTokens(st, nil))
 			body := map[string]string{"email": "alice@example.com", "password": "password123"}

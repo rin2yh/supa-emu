@@ -12,7 +12,7 @@ import (
 )
 
 func TestGetUser(t *testing.T) {
-	t.Run("正常系: 有効な Bearer で user を返す", func(t *testing.T) {
+	t.Run("success: returns user with a valid Bearer", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)
@@ -28,7 +28,7 @@ func TestGetUser(t *testing.T) {
 		}
 	})
 
-	t.Run("認証失敗のエラーコード分類", func(t *testing.T) {
+	t.Run("auth failure error-code classification", func(t *testing.T) {
 		cases := []struct {
 			name          string
 			setHeader     func(r *http.Request, validToken string)
@@ -36,17 +36,17 @@ func TestGetUser(t *testing.T) {
 			wantErrorCode string
 		}{
 			{
-				name:          "Authorization 欠落は no_authorization",
+				name:          "missing Authorization is no_authorization",
 				setHeader:     func(*http.Request, string) {},
 				wantErrorCode: "no_authorization",
 			},
 			{
-				name:          "不正な署名の Bearer は bad_jwt",
+				name:          "Bearer with invalid signature is bad_jwt",
 				setHeader:     func(r *http.Request, _ string) { r.Header.Set("Authorization", "Bearer not-a-jwt") },
 				wantErrorCode: "bad_jwt",
 			},
 			{
-				name: "user が削除済みは session_not_found",
+				name: "deleted user is session_not_found",
 				setHeader: func(r *http.Request, validToken string) {
 					r.Header.Set("Authorization", "Bearer "+validToken)
 				},
@@ -87,7 +87,7 @@ func TestGetUser(t *testing.T) {
 		}
 	})
 
-	t.Run("注入clockを進めて期限切れJWTで401", func(t *testing.T) {
+	t.Run("advancing the injected clock makes an expired JWT return 401", func(t *testing.T) {
 		current := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 		clock := func() time.Time { return current }
 		st := handlertest.NewStore(clock)

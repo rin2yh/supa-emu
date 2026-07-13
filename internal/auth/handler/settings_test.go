@@ -11,7 +11,7 @@ import (
 )
 
 func TestSettings(t *testing.T) {
-	t.Run("mailer_autoconfirm=true を返す", func(t *testing.T) {
+	t.Run("returns mailer_autoconfirm=true", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		f := handler.NewFactory(st, handlertest.NewTokens(st, nil))
 

@@ -12,7 +12,7 @@ import (
 
 func TestToken(t *testing.T) {
 	t.Run("password grant", func(t *testing.T) {
-		t.Run("正しい資格情報で200を返す", func(t *testing.T) {
+		t.Run("returns 200 with correct credentials", func(t *testing.T) {
 			st := handlertest.NewStore(nil)
 			tk := handlertest.NewTokens(st, nil)
 			f := handler.NewFactory(st, tk)
@@ -27,14 +27,14 @@ func TestToken(t *testing.T) {
 			}
 		})
 
-		t.Run("認証失敗で400 + invalid_grant + 'Invalid login credentials'", func(t *testing.T) {
+		t.Run("auth failure returns 400 + invalid_grant + 'Invalid login credentials'", func(t *testing.T) {
 			cases := []struct {
 				name string
 				body map[string]string
 			}{
-				{name: "誤ったpassword", body: map[string]string{"email": "alice@example.com", "password": "WRONG"}},
-				{name: "未登録email", body: map[string]string{"email": "nobody@example.com", "password": "password123"}},
-				{name: "emailもpasswordも空", body: map[string]string{}},
+				{name: "wrong password", body: map[string]string{"email": "alice@example.com", "password": "WRONG"}},
+				{name: "unregistered email", body: map[string]string{"email": "nobody@example.com", "password": "password123"}},
+				{name: "both email and password empty", body: map[string]string{}},
 			}
 			for _, c := range cases {
 				t.Run(c.name, func(t *testing.T) {
@@ -59,7 +59,7 @@ func TestToken(t *testing.T) {
 	})
 
 	t.Run("refresh_token grant", func(t *testing.T) {
-		t.Run("有効なrefresh_tokenで rotation した新ペアを返す", func(t *testing.T) {
+		t.Run("valid refresh_token returns a rotated new pair", func(t *testing.T) {
 			st := handlertest.NewStore(nil)
 			tk := handlertest.NewTokens(st, nil)
 			f := handler.NewFactory(st, tk)
@@ -79,13 +79,13 @@ func TestToken(t *testing.T) {
 			}
 		})
 
-		t.Run("不正なrefresh_tokenで400 + 'Invalid Refresh Token'", func(t *testing.T) {
+		t.Run("invalid refresh_token returns 400 + 'Invalid Refresh Token'", func(t *testing.T) {
 			cases := []struct {
 				name       string
 				refreshTok string
 			}{
-				{name: "存在しないtoken", refreshTok: "bogus"},
-				{name: "空文字", refreshTok: ""},
+				{name: "nonexistent token", refreshTok: "bogus"},
+				{name: "empty string", refreshTok: ""},
 			}
 			for _, c := range cases {
 				t.Run(c.name, func(t *testing.T) {
@@ -107,7 +107,7 @@ func TestToken(t *testing.T) {
 		})
 	})
 
-	t.Run("password grant: email のトレーリングスペースを TrimSpace してログインできる", func(t *testing.T) {
+	t.Run("password grant: trims trailing spaces from email and logs in", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)
@@ -122,7 +122,7 @@ func TestToken(t *testing.T) {
 		}
 	})
 
-	t.Run("grant_type 未指定で 400", func(t *testing.T) {
+	t.Run("missing grant_type returns 400", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		f := handler.NewFactory(st, handlertest.NewTokens(st, nil))
 
