@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.1.7](https://github.com/rin2yh/supa-emu/compare/v0.1.6...v0.1.7) - 2026-07-13
+- fix(auth): return JSON body on UnlinkIdentity success by @rin2yh in https://github.com/rin2yh/supa-emu/pull/16
+
 ## [v0.1.6](https://github.com/rin2yh/supa-emu/compare/v0.1.5...v0.1.6) - 2026-07-13
 - feat(oauth): emulate OAuth round trip, identity seed, and unlink DELETE by @rin2yh in https://github.com/rin2yh/supa-emu/pull/12
 - test: rename remaining t.Run case names to English by @rin2yh in https://github.com/rin2yh/supa-emu/pull/15
