@@ -28,6 +28,9 @@ type Store struct {
 	passkeys          map[string]*Passkey
 	passkeyByCred     map[string]string
 	passkeyChallenges map[string]*PasskeyChallenge
+	// authCodes maps an OAuth authorization code -> AuthCode, minted by
+	// GET /auth/v1/authorize and single-use consumed by the pkce token grant.
+	authCodes map[string]*AuthCode
 
 	clock         func() time.Time
 	reuseInterval time.Duration
@@ -62,6 +65,7 @@ func New(cfg Config) *Store {
 		passkeys:          make(map[string]*Passkey),
 		passkeyByCred:     make(map[string]string),
 		passkeyChallenges: make(map[string]*PasskeyChallenge),
+		authCodes:         make(map[string]*AuthCode),
 		clock:             cfg.Clock,
 		reuseInterval:     cfg.ReuseInterval,
 	}
@@ -80,6 +84,7 @@ func (s *Store) Reset() {
 	s.passkeys = make(map[string]*Passkey)
 	s.passkeyByCred = make(map[string]string)
 	s.passkeyChallenges = make(map[string]*PasskeyChallenge)
+	s.authCodes = make(map[string]*AuthCode)
 }
 
 func (s *Store) Snapshot() Snapshot {

@@ -1,11 +1,14 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
 
 	"github.com/google/uuid"
+
+	"github.com/rin2yh/supa-emu/internal/auth/store"
 )
 
 // Manual identity linking, served over GoTrue's
@@ -62,6 +65,46 @@ func LinkIdentityAuthorize(c *Context) {
 		return
 	}
 	c.Redirect(http.StatusFound, authorizeURL)
+}
+
+// UnlinkIdentity removes a linked provider identity from the authenticated user
+// (DELETE /auth/v1/user/identities/{identity_id}, supabase-js
+// unlinkIdentity(identity)). supabase-js targets the route with
+// identity.identity_id, so that is the value matched against the user's
+// identities. Requires a Bearer token; the 401 classification is shared with
+// GetUser via requireUser.
+//
+// GoTrue refuses to remove a user's only identity (a user must retain at least
+// one), reported here as 422 single_identity_not_deletable. A path id that does
+// not match any of the user's identities returns 404 identity_not_found. On
+// success it returns an empty 204, matching GoTrue.
+func UnlinkIdentity(c *Context) {
+	u, _, ok := requireUser(c)
+	if !ok {
+		return
+	}
+	identityID := strings.TrimSpace(c.Path("identity_id"))
+	if identityID == "" {
+		c.ErrorCode(http.StatusUnprocessableEntity, "validation_failed", "identity_id is required")
+		return
+	}
+
+	if _, err := c.store.RemoveIdentity(u.ID, identityID); err != nil {
+		switch {
+		case errors.Is(err, store.ErrLastIdentity):
+			c.ErrorCode(http.StatusUnprocessableEntity, "single_identity_not_deletable",
+				"User must have at least 1 identity after unlinking")
+		case errors.Is(err, store.ErrIdentityNotFound):
+			c.ErrorCode(http.StatusNotFound, "identity_not_found", "Identity not found")
+		case errors.Is(err, store.ErrUserNotFound):
+			c.ErrorCode(http.StatusUnauthorized, "session_not_found",
+				"AuthSessionMissingError: Auth session missing!")
+		default:
+			c.Error(http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+	c.NoContent()
 }
 
 // buildAuthorizeURL constructs the local authorize URL echoed back to the client:

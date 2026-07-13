@@ -10,6 +10,7 @@ import (
 
 	"github.com/rin2yh/supa-emu/internal/auth/handler"
 	"github.com/rin2yh/supa-emu/internal/auth/handler/handlertest"
+	"github.com/rin2yh/supa-emu/internal/auth/store"
 	"github.com/rin2yh/supa-emu/internal/config"
 )
 
@@ -18,7 +19,7 @@ func TestLinkIdentityAuthorize(t *testing.T) {
 		"&code_challenge=abc123&code_challenge_method=s256" +
 		"&redirect_to=http%3A%2F%2F127.0.0.1%3A3000%2Fcallback&skip_http_redirect=true"
 
-	t.Run("正常系: skip_http_redirect=true は 200 で { url } を返す", func(t *testing.T) {
+	t.Run("success: skip_http_redirect=true returns 200 with { url }", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)
@@ -70,7 +71,7 @@ func TestLinkIdentityAuthorize(t *testing.T) {
 		}
 	})
 
-	t.Run("skip_http_redirect なしは 302 で Location を返す", func(t *testing.T) {
+	t.Run("without skip_http_redirect returns 302 with Location", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)
@@ -96,7 +97,7 @@ func TestLinkIdentityAuthorize(t *testing.T) {
 		}
 	})
 
-	t.Run("github 以外のプロバイダも同じローカル authorize に寄せる", func(t *testing.T) {
+	t.Run("a non-github provider also resolves to the same local authorize", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)
@@ -127,9 +128,9 @@ func TestLinkIdentityAuthorize(t *testing.T) {
 		}
 	})
 
-	t.Run("末尾スラッシュ付き issuer でも二重スラッシュにならない", func(t *testing.T) {
+	t.Run("a trailing-slash issuer does not produce a double slash", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
-		// Issuer with a trailing slash must not produce "…//authorize".
+		// Issuer with a trailing slash must not produce "...//authorize".
 		tk := handler.NewTokens(st, config.DefaultJWTSecret, handlertest.Issuer+"/", time.Hour, nil)
 		f := handler.NewFactory(st, tk)
 		seeded := handlertest.Seed(t, st, tk, "alice@example.com", "password123")
@@ -159,7 +160,7 @@ func TestLinkIdentityAuthorize(t *testing.T) {
 		}
 	})
 
-	t.Run("provider 欠落は 422 validation_failed", func(t *testing.T) {
+	t.Run("missing provider is 422 validation_failed", func(t *testing.T) {
 		st := handlertest.NewStore(nil)
 		tk := handlertest.NewTokens(st, nil)
 		f := handler.NewFactory(st, tk)
@@ -178,7 +179,7 @@ func TestLinkIdentityAuthorize(t *testing.T) {
 		}
 	})
 
-	t.Run("認証失敗のエラーコード分類", func(t *testing.T) {
+	t.Run("auth failure error-code classification", func(t *testing.T) {
 		cases := []struct {
 			name          string
 			setHeader     func(r *http.Request, validToken string)
@@ -186,17 +187,17 @@ func TestLinkIdentityAuthorize(t *testing.T) {
 			wantErrorCode string
 		}{
 			{
-				name:          "Authorization 欠落は no_authorization",
+				name:          "missing Authorization is no_authorization",
 				setHeader:     func(*http.Request, string) {},
 				wantErrorCode: "no_authorization",
 			},
 			{
-				name:          "不正な署名の Bearer は bad_jwt",
+				name:          "a bad-signature Bearer is bad_jwt",
 				setHeader:     func(r *http.Request, _ string) { r.Header.Set("Authorization", "Bearer not-a-jwt") },
 				wantErrorCode: "bad_jwt",
 			},
 			{
-				name: "user が削除済みは session_not_found",
+				name: "a deleted user is session_not_found",
 				setHeader: func(r *http.Request, validToken string) {
 					r.Header.Set("Authorization", "Bearer "+validToken)
 				},
@@ -231,6 +232,116 @@ func TestLinkIdentityAuthorize(t *testing.T) {
 					t.Errorf("error_code want=%s body=%s", tc.wantErrorCode, rec.Body.String())
 				}
 			})
+		}
+	})
+}
+
+func TestUnlinkIdentity(t *testing.T) {
+	// addGithubIdentity attaches a github identity and returns its identity_id
+	// (the value unlinkIdentity targets).
+	addGithubIdentity := func(t *testing.T, st *store.Store, userID string) string {
+		t.Helper()
+		u, err := st.AddIdentity(userID, "github", map[string]any{"sub": "gh-123"})
+		if err != nil {
+			t.Fatalf("AddIdentity: %v", err)
+		}
+		for _, id := range u.Identities {
+			if id.Provider == "github" {
+				return id.IdentityID
+			}
+		}
+		t.Fatalf("github identity not found after AddIdentity")
+		return ""
+	}
+
+	t.Run("success: a seeded github identity can be unlinked with 204", func(t *testing.T) {
+		st := handlertest.NewStore(nil)
+		tk := handlertest.NewTokens(st, nil)
+		f := handler.NewFactory(st, tk)
+		seeded := handlertest.Seed(t, st, tk, "alice@example.com", "password123")
+		githubID := addGithubIdentity(t, st, seeded.User.ID)
+
+		req := handlertest.NewRequest(t, http.MethodDelete,
+			"/auth/v1/user/identities/"+githubID, nil, "identity_id", githubID)
+		req.Header.Set("Authorization", "Bearer "+seeded.AccessToken)
+		rec := httptest.NewRecorder()
+		handlertest.Serve(f, handler.UnlinkIdentity, rec, req)
+
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("status: %d body=%s", rec.Code, rec.Body.String())
+		}
+		if body := rec.Body.String(); body != "" {
+			t.Errorf("204 body want empty, got %q", body)
+		}
+		// The github identity must be gone; only email remains.
+		u, ok := st.FindUserByID(seeded.User.ID)
+		if !ok {
+			t.Fatalf("user gone")
+		}
+		for _, id := range u.Identities {
+			if id.Provider == "github" {
+				t.Errorf("github identity still present: %+v", id)
+			}
+		}
+	})
+
+	t.Run("the only identity cannot be unlinked: 422 single_identity_not_deletable", func(t *testing.T) {
+		st := handlertest.NewStore(nil)
+		tk := handlertest.NewTokens(st, nil)
+		f := handler.NewFactory(st, tk)
+		seeded := handlertest.Seed(t, st, tk, "alice@example.com", "password123")
+		// The user has only its default email identity.
+		emailIdentityID := seeded.User.Identities[0].IdentityID
+
+		req := handlertest.NewRequest(t, http.MethodDelete,
+			"/auth/v1/user/identities/"+emailIdentityID, nil, "identity_id", emailIdentityID)
+		req.Header.Set("Authorization", "Bearer "+seeded.AccessToken)
+		rec := httptest.NewRecorder()
+		handlertest.Serve(f, handler.UnlinkIdentity, rec, req)
+
+		if rec.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("status: %d body=%s", rec.Code, rec.Body.String())
+		}
+		if !strings.Contains(rec.Body.String(), `"error_code":"single_identity_not_deletable"`) {
+			t.Errorf("body=%s", rec.Body.String())
+		}
+	})
+
+	t.Run("an unknown identity_id is 404 identity_not_found", func(t *testing.T) {
+		st := handlertest.NewStore(nil)
+		tk := handlertest.NewTokens(st, nil)
+		f := handler.NewFactory(st, tk)
+		seeded := handlertest.Seed(t, st, tk, "alice@example.com", "password123")
+
+		req := handlertest.NewRequest(t, http.MethodDelete,
+			"/auth/v1/user/identities/does-not-exist", nil, "identity_id", "does-not-exist")
+		req.Header.Set("Authorization", "Bearer "+seeded.AccessToken)
+		rec := httptest.NewRecorder()
+		handlertest.Serve(f, handler.UnlinkIdentity, rec, req)
+
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("status: %d body=%s", rec.Code, rec.Body.String())
+		}
+		if !strings.Contains(rec.Body.String(), `"error_code":"identity_not_found"`) {
+			t.Errorf("body=%s", rec.Body.String())
+		}
+	})
+
+	t.Run("missing Authorization is 401 no_authorization", func(t *testing.T) {
+		st := handlertest.NewStore(nil)
+		tk := handlertest.NewTokens(st, nil)
+		f := handler.NewFactory(st, tk)
+
+		req := handlertest.NewRequest(t, http.MethodDelete,
+			"/auth/v1/user/identities/whatever", nil, "identity_id", "whatever")
+		rec := httptest.NewRecorder()
+		handlertest.Serve(f, handler.UnlinkIdentity, rec, req)
+
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("status: %d", rec.Code)
+		}
+		if !strings.Contains(rec.Body.String(), `"error_code":"no_authorization"`) {
+			t.Errorf("body=%s", rec.Body.String())
 		}
 	})
 }

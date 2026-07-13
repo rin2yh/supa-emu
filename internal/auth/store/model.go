@@ -24,6 +24,12 @@ type User struct {
 }
 
 type Identity struct {
+	// IdentityID is the identity row's own unique id. supabase-js
+	// unlinkIdentity(identity) issues DELETE /user/identities/{identity.identity_id},
+	// so this is the value the unlink route matches on. It mirrors GoTrue, whose
+	// identity JSON exposes the row id as "identity_id" and the provider-scoped id
+	// (the sub) as "id".
+	IdentityID   string         `json:"identity_id"`
 	ID           string         `json:"id"`
 	UserID       string         `json:"user_id"`
 	Provider     string         `json:"provider"`
@@ -31,6 +37,17 @@ type Identity struct {
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    time.Time      `json:"updated_at"`
 	LastSignInAt time.Time      `json:"last_sign_in_at"`
+}
+
+// AuthCode is a single-use OAuth authorization code minted by GET
+// /auth/v1/authorize and exchanged by POST /auth/v1/token?grant_type=pkce
+// (supabase-js exchangeCodeForSession). The emulator does not verify PKCE, so
+// the code carries only what the exchange needs: the user to sign in and an
+// expiry bounding the exchange window.
+type AuthCode struct {
+	Code      string
+	UserID    string
+	ExpiresAt time.Time
 }
 
 type RefreshToken struct {

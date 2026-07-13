@@ -3,9 +3,36 @@ package store
 import (
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
+
+// newUserLocked builds an authenticated user with the invariant defaults and
+// registers it in the users / emailIndex maps. It leaves Identities empty and
+// app_metadata unpopulated; callers seed the first identity and then call
+// recomputeProvidersLocked. The write lock must be held and email must be a
+// normalized, unique address (the caller checks uniqueness).
+func (s *Store) newUserLocked(email string, now time.Time) *User {
+	id := uuid.NewString()
+	confirmed := now
+	u := &User{
+		ID:               id,
+		Email:            email,
+		Aud:              "authenticated",
+		Role:             "authenticated",
+		EmailConfirmedAt: &confirmed,
+		ConfirmedAt:      &confirmed,
+		AppMetadata:      map[string]any{},
+		UserMetadata:     map[string]any{},
+		Identities:       []Identity{},
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}
+	s.users[id] = u
+	s.emailIndex[email] = id
+	return u
+}
 
 func (s *Store) CreateUser(email string, passwordHash []byte) (*User, error) {
 	s.mu.Lock()
@@ -19,32 +46,12 @@ func (s *Store) CreateUser(email string, passwordHash []byte) (*User, error) {
 	}
 
 	now := s.clock()
-	confirmed := now
-	id := uuid.NewString()
-	u := &User{
-		ID:               id,
-		Email:            normalized,
-		Aud:              "authenticated",
-		Role:             "authenticated",
-		EmailConfirmedAt: &confirmed,
-		ConfirmedAt:      &confirmed,
-		AppMetadata:      map[string]any{"provider": "email", "providers": []string{"email"}},
-		UserMetadata:     map[string]any{},
-		Identities: []Identity{{
-			ID:           id,
-			UserID:       id,
-			Provider:     "email",
-			IdentityData: map[string]any{"email": normalized, "sub": id},
-			CreatedAt:    now,
-			UpdatedAt:    now,
-			LastSignInAt: now,
-		}},
-		CreatedAt:    now,
-		UpdatedAt:    now,
-		PasswordHash: passwordHash,
-	}
-	s.users[id] = u
-	s.emailIndex[normalized] = id
+	u := s.newUserLocked(normalized, now)
+	u.PasswordHash = passwordHash
+	// The email identity's provider-scoped id (sub) is the user id, matching GoTrue.
+	u.Identities = append(u.Identities,
+		newIdentity(u.ID, "email", u.ID, map[string]any{"email": normalized, "sub": u.ID}, now))
+	recomputeProvidersLocked(u)
 	return s.cloneUser(u), nil
 }
 

@@ -42,8 +42,13 @@ func run(args []string) error {
 	mux.Handle("POST /auth/v1/signup", f.Handle(handler.Signup))
 	mux.Handle("POST /auth/v1/token", f.Handle(handler.Token))
 	mux.Handle("GET /auth/v1/user", f.Handle(handler.GetUser))
+	// OAuth sign-in round trip (signInWithOAuth -> callback -> exchangeCodeForSession):
+	// authorize mints a code, the pkce token grant swaps it for a session.
+	mux.Handle("GET /auth/v1/authorize", f.Handle(handler.Authorize))
 	// Manual identity linking (auth.linkIdentity): start the OAuth link flow.
 	mux.Handle("GET /auth/v1/user/identities/authorize", f.Handle(handler.LinkIdentityAuthorize))
+	// Identity unlink (auth.unlinkIdentity): remove a linked provider identity.
+	mux.Handle("DELETE /auth/v1/user/identities/{identity_id}", f.Handle(handler.UnlinkIdentity))
 	mux.Handle("POST /auth/v1/logout", f.Handle(handler.Logout))
 	// WebAuthn MFA (second factor): enroll -> challenge -> verify -> unenroll
 	mux.Handle("POST /auth/v1/factors", f.Handle(handler.EnrollFactor))
