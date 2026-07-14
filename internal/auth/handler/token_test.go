@@ -49,7 +49,6 @@ func TestToken(t *testing.T) {
 					if rec.Code != http.StatusBadRequest {
 						t.Fatalf("status: %d", rec.Code)
 					}
-					// 本番 GoTrue 互換の JSON エラー形式を検証する。
 					raw := rec.Body.String()
 					var body struct {
 						ErrorCode string `json:"error_code"`
@@ -62,9 +61,8 @@ func TestToken(t *testing.T) {
 					if body.Msg != "Invalid login credentials" {
 						t.Errorf("msg: got %q, want %q", body.Msg, "Invalid login credentials")
 					}
-					// code キーは出さないこと。auth-js は api-version ヘッダ有り時に
-					// code(string) を優先するため、code が有ると error.code が
-					// invalid_credentials にならない。生 body の "code" 不在で担保する。
+					// With the api-version header set, auth-js prefers code(string), so a
+					// code key would stop error.code from being invalid_credentials.
 					if strings.Contains(raw, `"code"`) {
 						t.Errorf(`"code" key must be absent so auth-js falls back to error_code: %s`, raw)
 					}
