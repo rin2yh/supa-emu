@@ -44,20 +44,20 @@ func tokenPassword(c *Context) {
 	// トレーリングスペース付き email でログインできない非対称が生まれる。
 	req.Email = strings.TrimSpace(req.Email)
 	if req.Email == "" || req.Password == "" {
-		c.OAuth(http.StatusBadRequest, "invalid_grant", "Invalid login credentials")
+		c.GoTrueError(http.StatusBadRequest, "invalid_credentials", "Invalid login credentials")
 		return
 	}
 
 	u, ok := c.store.FindUserByEmail(req.Email)
 	if !ok || !store.VerifyPassword(u.PasswordHash, req.Password) {
-		c.OAuth(http.StatusBadRequest, "invalid_grant", "Invalid login credentials")
+		c.GoTrueError(http.StatusBadRequest, "invalid_credentials", "Invalid login credentials")
 		return
 	}
 
 	// 並行 DeleteUser で消えていたら ok=false。更新後の clone をそのまま Issue に渡す。
 	fresh, ok := c.store.UpdateLastSignIn(u.ID)
 	if !ok {
-		c.OAuth(http.StatusBadRequest, "invalid_grant", "Invalid login credentials")
+		c.GoTrueError(http.StatusBadRequest, "invalid_credentials", "Invalid login credentials")
 		return
 	}
 

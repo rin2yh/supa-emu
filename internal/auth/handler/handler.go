@@ -160,6 +160,16 @@ type apiErrorBody struct {
 	Msg       string `json:"msg"`
 }
 
+// gotrueErrorBody は本番 GoTrue 互換の資格情報エラー body を表す。apiErrorBody と
+// 違い code キーを出さないのが要点。supa-emu は writeError で X-Supabase-Api-Version
+// を付けるため、@supabase/auth-js の handleError は code(string) を優先して
+// AuthError.code にマップする。code を省けば error_code(string) のフォールバックが
+// 選ばれ、consumer 側は error.code === 'invalid_credentials' を単一条件で判定できる。
+type gotrueErrorBody struct {
+	ErrorCode string `json:"error_code"`
+	Msg       string `json:"msg"`
+}
+
 type oauthErrorBody struct {
 	Error            string `json:"error"`
 	ErrorDescription string `json:"error_description,omitempty"`
@@ -175,6 +185,13 @@ func (c *Context) ErrorCode(status int, errCode, msg string) {
 
 func (c *Context) OAuth(status int, errCode, description string) {
 	c.writeError(status, oauthErrorBody{Error: errCode, ErrorDescription: description})
+}
+
+// GoTrueError は本番 GoTrue 互換のエラー JSON {"error_code","msg"} を書く。
+// password grant の資格情報エラーで OAuth 形式の代わりに使い、consumer 側が
+// error.code === 'invalid_credentials' を単一条件で判定できるようにする。
+func (c *Context) GoTrueError(status int, errCode, msg string) {
+	c.writeError(status, gotrueErrorBody{ErrorCode: errCode, Msg: msg})
 }
 
 // writeError は X-Supabase-Api-Version の付与とエラー JSON 書き出しを 1 箇所に集約する。
