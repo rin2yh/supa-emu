@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.1.8](https://github.com/rin2yh/supa-emu/compare/v0.1.7...v0.1.8) - 2026-07-14
+- feat(auth): return production-GoTrue-compatible invalid_credentials error on password grant by @rin2yh in https://github.com/rin2yh/supa-emu/pull/18
+
 ## [v0.1.7](https://github.com/rin2yh/supa-emu/compare/v0.1.6...v0.1.7) - 2026-07-13
 - fix(auth): return JSON body on UnlinkIdentity success by @rin2yh in https://github.com/rin2yh/supa-emu/pull/16
 
