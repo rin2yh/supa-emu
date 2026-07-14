@@ -27,7 +27,7 @@ func TestToken(t *testing.T) {
 			}
 		})
 
-		t.Run("auth failure returns 400 + invalid_grant + 'Invalid login credentials'", func(t *testing.T) {
+		t.Run("auth failure returns 400 + invalid_credentials + 'Invalid login credentials'", func(t *testing.T) {
 			cases := []struct {
 				name string
 				body map[string]string
@@ -49,9 +49,25 @@ func TestToken(t *testing.T) {
 					if rec.Code != http.StatusBadRequest {
 						t.Fatalf("status: %d", rec.Code)
 					}
-					body := rec.Body.String()
-					if !strings.Contains(body, "invalid_grant") || !strings.Contains(body, "Invalid login credentials") {
-						t.Errorf("body: %s", body)
+					raw := rec.Body.String()
+					var body struct {
+						ErrorCode string `json:"error_code"`
+						Msg       string `json:"msg"`
+					}
+					handlertest.DecodeJSON(t, rec, &body)
+					if body.ErrorCode != "invalid_credentials" {
+						t.Errorf("error_code: got %q, want %q", body.ErrorCode, "invalid_credentials")
+					}
+					if body.Msg != "Invalid login credentials" {
+						t.Errorf("msg: got %q, want %q", body.Msg, "Invalid login credentials")
+					}
+					// With the api-version header set, auth-js prefers code(string), so a
+					// code key would stop error.code from being invalid_credentials.
+					if strings.Contains(raw, `"code"`) {
+						t.Errorf(`"code" key must be absent so auth-js falls back to error_code: %s`, raw)
+					}
+					if strings.Contains(raw, "invalid_grant") {
+						t.Errorf("legacy OAuth error still present: %s", raw)
 					}
 				})
 			}

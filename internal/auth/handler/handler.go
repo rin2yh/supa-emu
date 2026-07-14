@@ -160,6 +160,16 @@ type apiErrorBody struct {
 	Msg       string `json:"msg"`
 }
 
+// gotrueErrorBody omits the code key on purpose (unlike apiErrorBody). Because
+// writeError sets X-Supabase-Api-Version, @supabase/auth-js's handleError prefers
+// code(string) over error_code(string) when mapping AuthError.code. Dropping code
+// makes it fall back to error_code, so consumers can match error.code in a single
+// condition.
+type gotrueErrorBody struct {
+	ErrorCode string `json:"error_code"`
+	Msg       string `json:"msg"`
+}
+
 type oauthErrorBody struct {
 	Error            string `json:"error"`
 	ErrorDescription string `json:"error_description,omitempty"`
@@ -175,6 +185,12 @@ func (c *Context) ErrorCode(status int, errCode, msg string) {
 
 func (c *Context) OAuth(status int, errCode, description string) {
 	c.writeError(status, oauthErrorBody{Error: errCode, ErrorDescription: description})
+}
+
+// GoTrueError writes a production-GoTrue-compatible error body so consumers can
+// match error.code (e.g. 'invalid_credentials') instead of the message string.
+func (c *Context) GoTrueError(status int, errCode, msg string) {
+	c.writeError(status, gotrueErrorBody{ErrorCode: errCode, Msg: msg})
 }
 
 // writeError は X-Supabase-Api-Version の付与とエラー JSON 書き出しを 1 箇所に集約する。
