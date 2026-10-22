@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.1.9](https://github.com/rin2yh/supa-emu/compare/v0.1.8...v0.1.9) - 2026-10-22
+- chore: add Renovate with a 7-day minimum release age by @rin2yh in https://github.com/rin2yh/supa-emu/pull/20
+- chore(renovate): enable automerge by @rin2yh in https://github.com/rin2yh/supa-emu/pull/26
+- chore(deps): update actions/checkout action to v6.1.0 by @renovate[bot] in https://github.com/rin2yh/supa-emu/pull/23
+
 ## [v0.1.8](https://github.com/rin2yh/supa-emu/compare/v0.1.7...v0.1.8) - 2026-07-14
 - feat(auth): return production-GoTrue-compatible invalid_credentials error on password grant by @rin2yh in https://github.com/rin2yh/supa-emu/pull/18
 
