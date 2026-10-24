@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.1.10](https://github.com/rin2yh/supa-emu/compare/v0.1.9...v0.1.10) - 2026-10-24
+
+- chore(deps): update actions/setup-go action to v6.5.0 by @renovate[bot] in https://github.com/rin2yh/supa-emu/pull/24
+- chore(deps): update golangci/golangci-lint-action action to v9.3.0 by @renovate[bot] in https://github.com/rin2yh/supa-emu/pull/30
+- chore(deps): update goreleaser/goreleaser-action action to v7.3.0 by @renovate[bot] in https://github.com/rin2yh/supa-emu/pull/32
+- chore(deps): update songmu/tagpr action to v1.21.2 by @renovate[bot] in https://github.com/rin2yh/supa-emu/pull/33
+- fix(deps): update module golang.org/x/crypto to v0.58.0 by @renovate[bot] in https://github.com/rin2yh/supa-emu/pull/34
+- chore(deps): update actions/checkout action to v7 by @renovate[bot] in https://github.com/rin2yh/supa-emu/pull/35
+- chore(deps): update songmu/tagpr action to v1.21.3 by @renovate[bot] in https://github.com/rin2yh/supa-emu/pull/38
+- chore(deps): update actions/setup-go action to v7 by @renovate[bot] in https://github.com/rin2yh/supa-emu/pull/36
+- chore(deps): update dependency ubuntu to v26 by @renovate[bot] in https://github.com/rin2yh/supa-emu/pull/37
+
 ## [v0.1.9](https://github.com/rin2yh/supa-emu/compare/v0.1.8...v0.1.9) - 2026-10-22
 - chore: add Renovate with a 7-day minimum release age by @rin2yh in https://github.com/rin2yh/supa-emu/pull/20
 - chore(renovate): enable automerge by @rin2yh in https://github.com/rin2yh/supa-emu/pull/26
