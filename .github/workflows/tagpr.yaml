@@ -6,7 +6,7 @@ on:
 
 jobs:
   tagpr:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
       pull-requests: write
@@ -25,7 +25,7 @@ jobs:
   release:
     needs: tagpr
     if: needs.tagpr.outputs.tag != ''   # 実際にタグを打った時だけ発火
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
     steps:
